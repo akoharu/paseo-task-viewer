@@ -1,0 +1,10 @@
+{
+  "id": "task-viewer",
+  "name": "Task viewer",
+  "description": "See your ClickUp tasks, Linear issues, and manual tasks in Paseo, and hand any of them to a coding agent",
+  "icon": "assets/icon.png",
+  "media": [],
+  "requirements": {
+    "paseo": ">=0.12.0"
+  }
+}
