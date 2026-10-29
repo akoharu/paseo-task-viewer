@@ -13,7 +13,9 @@ export type RemoteTicket = Pick<
   | "availableStatuses"
   | "container"
   | "priority"
+  | "priorityRank"
   | "dueDate"
+  | "cycle"
 > & { externalId: string; remoteUpdatedAt: string | null };
 
 export class HttpError extends Error {

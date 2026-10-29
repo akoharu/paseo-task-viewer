@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 - 2026-10-29
+
+- Show the priority of each task (urgent, high, normal or medium, low) as a colored badge.
+- Show the due date on each task, with highlights for overdue, due today, and due tomorrow.
+- Show the Linear cycle of each issue and whether it is the current, a past, or an upcoming cycle.
+- Add the cycle to the agent prompt.
+- Tasks saved by 0.1.0 load without changes and get the new fields on the next sync.
+
 ## 0.1.0 - 2026-10-29
 
 First release.

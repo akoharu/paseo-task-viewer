@@ -42,6 +42,8 @@ function groupFor(status: z.infer<typeof statusSchema>): StatusGroup {
   return "in_progress";
 }
 
+const CLICKUP_PRIORITY_RANK: Record<string, number> = { urgent: 1, high: 2, normal: 3, low: 4 };
+
 function toIso(ms: string | null | undefined): string | null {
   if (!ms) return null;
   const value = Number(ms);
@@ -49,6 +51,7 @@ function toIso(ms: string | null | undefined): string | null {
 }
 
 function toTicket(task: ClickUpTask, statuses: TicketStatus[]): RemoteTicket {
+  const priority = task.priority?.priority?.toLowerCase() ?? null;
   return {
     externalId: task.id,
     identifier: task.custom_id ?? null,
@@ -60,8 +63,11 @@ function toTicket(task: ClickUpTask, statuses: TicketStatus[]): RemoteTicket {
     statusColor: task.status.color ?? null,
     availableStatuses: statuses,
     container: task.list?.name ?? null,
-    priority: task.priority?.priority ?? null,
+    priority: priority ? priority[0].toUpperCase() + priority.slice(1) : null,
+    priorityRank: priority ? (CLICKUP_PRIORITY_RANK[priority] ?? null) : null,
     dueDate: toIso(task.due_date),
+    // ClickUp has no cycles. Sprints are plain lists, shown as the list name.
+    cycle: null,
     remoteUpdatedAt: toIso(task.date_updated),
   };
 }

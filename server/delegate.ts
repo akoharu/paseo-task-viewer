@@ -2,6 +2,8 @@ import type { RpcInput } from "@getpaseo/plugin";
 import type { PluginHandlerContext } from "@getpaseo/plugin/server";
 import {
   type Assignment,
+  cycleLabel,
+  cycleState,
   type delegateTaskRpc,
   SOURCE_LABELS,
   STATUS_GROUP_LABELS,
@@ -71,6 +73,9 @@ export function buildPrompt(task: Task, input: DelegateInput, branch: string | n
     task.url ? `Link: ${task.url}` : null,
     task.priority ? `Priority: ${task.priority}` : null,
     task.dueDate ? `Due: ${task.dueDate.slice(0, 10)}` : null,
+    task.cycle
+      ? `Cycle: ${cycleLabel(task.cycle)} (${cycleState(task.cycle)}, ${task.cycle.startsAt.slice(0, 10)} to ${task.cycle.endsAt.slice(0, 10)})`
+      : null,
     "",
     "## Description",
     task.description.trim() || "(no description)",

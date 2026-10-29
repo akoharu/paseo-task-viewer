@@ -2,7 +2,7 @@ Task viewer shows your ClickUp tasks, Linear issues, and your own manual tasks o
 
 ## How it works
 
-The Paseo daemon pulls the open tickets that are assigned to you from ClickUp and Linear. It syncs on a schedule (every 15 minutes by default) and when you press Sync now. The status of a synced ticket always comes from ClickUp or Linear. Task viewer never changes tickets itself.
+The Paseo daemon pulls the open tickets that are assigned to you from ClickUp and Linear. It syncs on a schedule (every 15 minutes by default) and when you press Sync now. The status of a synced ticket always comes from ClickUp or Linear. Task viewer never changes tickets itself. Each task shows its priority and due date, and overdue or soon-due tasks are highlighted. Linear issues also show their cycle and whether it is the current, a past, or an upcoming cycle.
 
 When you delegate a task, you choose a project, a new worktree or the local checkout, a branch name, and an agent provider and model. The agent's first prompt contains the ticket details, the status names that ticket can use, and rules to keep the status up to date: move it to in progress when work starts, move it to review when a PR is open, add a closing comment, and never mark it done without your approval. The agent updates the ticket through the ClickUp or Linear MCP tools or API access that its provider has. The next sync shows the new status.
 

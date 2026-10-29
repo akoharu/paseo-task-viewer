@@ -7,6 +7,7 @@ A [Paseo](https://paseo.sh) plugin that shows your ClickUp tasks, Linear issues,
 ## Features
 
 - **One list for all your work.** ClickUp tasks and Linear issues assigned to you, plus manual tasks (for example a request from a Slack thread). Filter by source and state, and search.
+- **Priority, deadline, and cycle at a glance.** Each task shows its priority, its due date (with "Overdue", "Due today", and "Due tomorrow" highlights), and for Linear issues the cycle and whether it is the current one.
 - **Real status.** The status of a synced ticket always comes from ClickUp or Linear. Sync runs on a schedule (every 15 minutes by default) or when you press **Sync now**.
 - **Delegate to an agent.** Pick a project, choose **New worktree** or **Local checkout**, set a branch name (suggested from the ticket), and choose the agent provider and model.
 - **Status-aware agents.** The agent's prompt contains the ticket details, the exact status names the ticket can use, and rules for keeping the status up to date through the agent's ClickUp or Linear MCP tools or API.

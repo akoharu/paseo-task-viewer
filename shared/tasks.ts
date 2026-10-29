@@ -28,6 +28,15 @@ export const assignmentSchema = z.object({
 });
 export type Assignment = z.infer<typeof assignmentSchema>;
 
+// A Linear cycle. Current, past, or upcoming is computed from the dates when shown, so it stays right between syncs.
+export const cycleSchema = z.object({
+  number: z.number(),
+  name: z.string().nullable(),
+  startsAt: z.string(),
+  endsAt: z.string(),
+});
+export type Cycle = z.infer<typeof cycleSchema>;
+
 export const taskSchema = z.object({
   id: z.string(),
   source: taskSourceSchema,
@@ -43,7 +52,12 @@ export const taskSchema = z.object({
   availableStatuses: z.array(ticketStatusSchema),
   container: z.string().nullable(),
   priority: z.string().nullable(),
+  // 1 = urgent, 2 = high, 3 = normal/medium, 4 = low, null = no priority.
+  // Defaults keep tasks saved by 0.1.0 readable.
+  priorityRank: z.number().int().min(1).max(4).nullable().default(null),
+  // Date-only ("2026-11-03") for Linear, a full ISO timestamp for ClickUp.
   dueDate: z.string().nullable(),
+  cycle: cycleSchema.nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
   syncedAt: z.string().nullable(),
@@ -175,4 +189,23 @@ export function suggestBranchName(task: Pick<Task, "identifier" | "title">): str
     .slice(0, 60)
     .replace(/-+$/g, "");
   return slug || "task";
+}
+
+export type CycleState = "current" | "past" | "upcoming";
+
+export function cycleState(cycle: Cycle, now = Date.now()): CycleState {
+  if (now < Date.parse(cycle.startsAt)) return "upcoming";
+  if (now >= Date.parse(cycle.endsAt)) return "past";
+  return "current";
+}
+
+export function cycleLabel(cycle: Cycle): string {
+  return cycle.name ? `Cycle ${cycle.number}: ${cycle.name}` : `Cycle ${cycle.number}`;
+}
+
+// Reads "2026-11-03" as a local calendar date, so it does not shift a day in western time zones.
+export function parseDueDate(value: string): Date {
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (dateOnly) return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+  return new Date(value);
 }

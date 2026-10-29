@@ -16,7 +16,7 @@ import {
   type TaskListOutput,
   updateTaskRpc,
 } from "../shared/tasks";
-import { Button, Chip, ChipRow, errorMessage, Label, relativeTime, statusColor, type Theme } from "./kit";
+import { Button, Chip, ChipRow, errorMessage, Label, relativeTime, statusColor, TaskBadges, type Theme } from "./kit";
 
 type Props = Pick<PluginSurfaceProps, "theme" | "layout" | "navigation"> & {
   task: Task;
@@ -63,10 +63,9 @@ export function TaskDetail({ theme, layout, navigation, task, onClose }: Props) 
         <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: task.statusColor ?? statusColor(theme, task.statusGroup) }} />
           <Text style={{ color: statusColor(theme, task.statusGroup), fontWeight: "600" }}>{task.status}</Text>
-          {task.priority ? <Text style={muted}>Priority: {task.priority}</Text> : null}
-          {task.dueDate ? <Text style={muted}>Due: {task.dueDate.slice(0, 10)}</Text> : null}
           {task.syncedAt ? <Text style={muted}>Synced {relativeTime(task.syncedAt)}</Text> : null}
         </View>
+        <TaskBadges theme={theme} task={task} />
         {task.missing ? (
           <Text style={{ color: theme.colors.statusWarning, fontSize: 12 }}>
             This ticket is no longer in your assigned queue (unassigned, filtered out, or deleted).

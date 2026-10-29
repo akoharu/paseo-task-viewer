@@ -5,7 +5,8 @@ import { looksLikeReview, type RemoteTicket, requestJson } from "./remote";
 const API = "https://api.linear.app/graphql";
 
 const ISSUE_FIELDS = `
-  id identifier title description url priorityLabel dueDate updatedAt
+  id identifier title description url priority priorityLabel dueDate updatedAt
+  cycle { number name startsAt endsAt }
   state { name type color }
   team { key name states { nodes { name type position } } }
 `;
@@ -17,7 +18,13 @@ const issueSchema = z.object({
   title: z.string(),
   description: z.string().nullable().optional(),
   url: z.string(),
+  // 0 = no priority, 1 = urgent, 2 = high, 3 = medium, 4 = low.
+  priority: z.number().int().min(0).max(4),
   priorityLabel: z.string().nullable().optional(),
+  cycle: z
+    .object({ number: z.number(), name: z.string().nullable().optional(), startsAt: z.string(), endsAt: z.string() })
+    .nullable()
+    .optional(),
   dueDate: z.string().nullable().optional(),
   updatedAt: z.string(),
   state: stateSchema,
@@ -86,8 +93,17 @@ function toTicket(issue: LinearIssue): RemoteTicket {
     statusColor: issue.state.color ?? null,
     availableStatuses: states.map((state) => ({ name: state.name, group: groupForState(state) })),
     container: issue.team.name,
-    priority: issue.priorityLabel ?? null,
+    priority: issue.priority === 0 ? null : (issue.priorityLabel ?? null),
+    priorityRank: issue.priority === 0 ? null : issue.priority,
     dueDate: issue.dueDate ?? null,
+    cycle: issue.cycle
+      ? {
+          number: issue.cycle.number,
+          name: issue.cycle.name ?? null,
+          startsAt: issue.cycle.startsAt,
+          endsAt: issue.cycle.endsAt,
+        }
+      : null,
     remoteUpdatedAt: issue.updatedAt,
   };
 }

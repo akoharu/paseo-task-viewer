@@ -16,7 +16,7 @@ import {
   type TaskListOutput,
   type TaskSource,
 } from "../shared/tasks";
-import { Button, Chip, ChipRow, errorMessage, relativeTime, statusColor, type Theme } from "./kit";
+import { Button, Chip, ChipRow, errorMessage, relativeTime, statusColor, TaskBadges, type Theme } from "./kit";
 import { TaskDetail } from "./task-detail";
 
 type SourceFilter = "all" | TaskSource;
@@ -203,7 +203,7 @@ function TaskRow({ theme, task, onPress }: { theme: Theme; task: Task; onPress()
       })}
     >
       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: task.statusColor ?? statusColor(theme, task.statusGroup) }} />
-      <View style={{ flex: 1, gap: 2 }}>
+      <View style={{ flex: 1, gap: 4 }}>
         <Text numberOfLines={2} style={{ color: theme.colors.foreground, fontWeight: "500" }}>
           {task.title}
         </Text>
@@ -211,6 +211,7 @@ function TaskRow({ theme, task, onPress }: { theme: Theme; task: Task; onPress()
           {meta}
           {task.missing ? " · not in your queue" : ""}
         </Text>
+        <TaskBadges theme={theme} task={task} />
       </View>
       <View style={{ alignItems: "flex-end", gap: 2 }}>
         <Text numberOfLines={1} style={{ color: statusColor(theme, task.statusGroup), fontSize: 12, fontWeight: "600" }}>

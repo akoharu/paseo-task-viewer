@@ -1,7 +1,7 @@
 import type { PluginHostProps } from "@getpaseo/plugin/client";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import type { StatusGroup } from "../shared/tasks";
+import { cycleLabel, cycleState, isOpenStatus, parseDueDate, type StatusGroup, type Task } from "../shared/tasks";
 
 export type Theme = PluginHostProps["theme"];
 
@@ -120,4 +120,71 @@ export function relativeTime(iso: string | null): string {
 
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+export function priorityColor(theme: Theme, rank: number | null): string {
+  switch (rank) {
+    case 1:
+      return theme.colors.statusDanger;
+    case 2:
+      return theme.colors.statusWarning;
+    case 3:
+      return theme.colors.accent;
+    default:
+      return theme.colors.foregroundMuted;
+  }
+}
+
+function startOfDay(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+function shortDate(date: Date): string {
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString(undefined, sameYear ? { month: "short", day: "numeric" } : { year: "numeric", month: "short", day: "numeric" });
+}
+
+export function dueBadge(theme: Theme, task: Pick<Task, "dueDate" | "statusGroup">): { label: string; color: string } | null {
+  if (!task.dueDate) return null;
+  const due = parseDueDate(task.dueDate);
+  if (Number.isNaN(due.getTime())) return null;
+  const days = Math.round((startOfDay(due) - startOfDay(new Date())) / 86_400_000);
+  const date = shortDate(due);
+  // A finished task is never overdue, so only show the date.
+  if (!isOpenStatus(task.statusGroup)) return { label: `Due ${date}`, color: theme.colors.foregroundMuted };
+  if (days < 0) return { label: `Overdue · ${date}`, color: theme.colors.statusDanger };
+  if (days === 0) return { label: "Due today", color: theme.colors.statusWarning };
+  if (days === 1) return { label: "Due tomorrow", color: theme.colors.statusWarning };
+  return { label: `Due ${date}`, color: theme.colors.foreground };
+}
+
+export function cycleBadge(theme: Theme, task: Pick<Task, "cycle">): { label: string; color: string } | null {
+  if (!task.cycle) return null;
+  const state = cycleState(task.cycle);
+  const color = state === "current" ? theme.colors.accent : theme.colors.foregroundMuted;
+  return { label: `${cycleLabel(task.cycle)} · ${state}`, color };
+}
+
+function Badge({ label, color }: { label: string; color: string }) {
+  return (
+    <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: color }}>
+      <Text numberOfLines={1} style={{ color, fontSize: 11, fontWeight: "600" }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+// Priority, deadline, and Linear cycle. Renders nothing when the task has none of them.
+export function TaskBadges({ theme, task }: { theme: Theme; task: Task }) {
+  const due = dueBadge(theme, task);
+  const cycle = cycleBadge(theme, task);
+  if (!task.priority && !due && !cycle) return null;
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+      {task.priority ? <Badge label={task.priority} color={priorityColor(theme, task.priorityRank)} /> : null}
+      {due ? <Badge label={due.label} color={due.color} /> : null}
+      {cycle ? <Badge label={cycle.label} color={cycle.color} /> : null}
+    </View>
+  );
 }
