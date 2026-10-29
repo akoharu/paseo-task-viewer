@@ -58,6 +58,8 @@ export const taskSchema = z.object({
   // Date-only ("2026-11-03") for Linear, a full ISO timestamp for ClickUp.
   dueDate: z.string().nullable(),
   cycle: cycleSchema.nullable().default(null),
+  // The Linear project the issue belongs to.
+  project: z.object({ id: z.string(), name: z.string() }).nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
   syncedAt: z.string().nullable(),

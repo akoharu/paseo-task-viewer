@@ -8,6 +8,7 @@ A [Paseo](https://paseo.sh) plugin that shows your ClickUp tasks, Linear issues,
 
 - **One list for all your work.** ClickUp tasks and Linear issues assigned to you, plus manual tasks (for example a request from a Slack thread). Filter by source and state, and search.
 - **Priority, deadline, and cycle at a glance.** Each task shows its priority, its due date (with "Overdue", "Due today", and "Due tomorrow" highlights), and for Linear issues the cycle and whether it is the current one.
+- **Linear project monitoring.** A Projects tab lists the active Linear projects you lead, are a member of, or have issues in. Each card shows status, health, progress, open issues per stage, target date, lead, and how many open issues are yours. Projects that need attention (overdue, at risk, off track) come first. Open a project to see every issue in it, grouped by stage, with filters for open or done work and for your, unassigned, or everyone's issues.
 - **Real status.** The status of a synced ticket always comes from ClickUp or Linear. Sync runs on a schedule (every 15 minutes by default) or when you press **Sync now**.
 - **Delegate to an agent.** Pick a project, choose **New worktree** or **Local checkout**, set a branch name (suggested from the ticket), and choose the agent provider and model.
 - **Status-aware agents.** The agent's prompt contains the ticket details, the exact status names the ticket can use, and rules for keeping the status up to date through the agent's ClickUp or Linear MCP tools or API.
@@ -38,8 +39,8 @@ Paseo plugins are trusted, unsandboxed code. Please read the source before you i
    - Linear: **Settings → Security & access → Personal API keys**.
 
    Instead, you can set `CLICKUP_API_TOKEN` and `LINEAR_API_KEY` in the daemon environment. A saved token takes priority over an environment variable.
-3. Optional: limit the sync to some ClickUp workspaces or lists, or to some Linear team keys, and set your default agent provider, model, and delegation mode.
-4. Open **Tasks** in the sidebar.
+3. Open **Tasks** in the sidebar. Switch between **My tasks** and **Projects** at the top.
+4. Optional: limit the sync to some ClickUp workspaces or lists, or to some Linear team keys, and set your default agent provider, model, and delegation mode.
 
 ## How delegation works
 
@@ -63,6 +64,7 @@ Task viewer itself never writes to ClickUp or Linear.
 
 - Tokens are stored in `$PASEO_HOME/plugin-data/task-viewer/secrets.json` (default `~/.paseo`) with file permission `0600`. They are only sent to `api.clickup.com` and `api.linear.app`, never to the app, and never logged.
 - Tasks are stored in `$PASEO_HOME/plugin-data/task-viewer/tasks.json`.
+- Linear project data is read live when you open the Projects tab or a project, and kept in memory for one minute. It is not saved to disk.
 - Preferences (no secrets) are stored in Paseo's plugin settings for the host.
 - When you delegate a task, its details go into the agent prompt, which is sent to the agent provider you choose.
 

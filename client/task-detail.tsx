@@ -16,6 +16,7 @@ import {
   type TaskListOutput,
   updateTaskRpc,
 } from "../shared/tasks";
+import { openProjectInput, useOpenScreen } from "./navigation";
 import { Button, Chip, ChipRow, errorMessage, Label, relativeTime, statusColor, TaskBadges, type Theme } from "./kit";
 
 type Props = Pick<PluginSurfaceProps, "theme" | "layout" | "navigation"> & {
@@ -33,6 +34,7 @@ export function TaskDetail({ theme, layout, navigation, task, onClose }: Props) 
   const toast = useToast();
   const updateTask = useRpc(updateTaskRpc);
   const deleteTask = useRpc(deleteTaskRpc);
+  const openScreen = useOpenScreen();
 
   const statusMutation = useMutation({
     mutationFn: (statusGroup: StatusGroup) => updateTask({ id: task.id, statusGroup }),
@@ -55,7 +57,7 @@ export function TaskDetail({ theme, layout, navigation, task, onClose }: Props) 
     <View style={{ gap: 16 }}>
       <View style={{ gap: 6 }}>
         <Text style={muted}>
-          {[SOURCE_LABELS[task.source], task.identifier, task.container].filter(Boolean).join(" · ")}
+          {[SOURCE_LABELS[task.source], task.identifier, task.project?.name ?? task.container].filter(Boolean).join(" · ")}
         </Text>
         <Text selectable style={{ ...text, fontSize: layout.compact ? 18 : 20, fontWeight: "600" }}>
           {task.title}
@@ -78,6 +80,17 @@ export function TaskDetail({ theme, layout, navigation, task, onClose }: Props) 
               variant="secondary"
               label={task.source === "manual" ? "Open link" : `Open in ${SOURCE_LABELS[task.source]}`}
               onPress={() => void openExternalUrl(task.url as string).catch((error) => toast.error(errorMessage(error)))}
+            />
+          ) : null}
+          {task.project && openScreen ? (
+            <Button
+              theme={theme}
+              variant="secondary"
+              label="Open project"
+              onPress={() => {
+                openScreen(openProjectInput(task.project as { id: string; name: string }));
+                onClose();
+              }}
             />
           ) : null}
           {task.source === "manual" ? (

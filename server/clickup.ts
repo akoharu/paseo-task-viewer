@@ -68,6 +68,7 @@ function toTicket(task: ClickUpTask, statuses: TicketStatus[]): RemoteTicket {
     dueDate: toIso(task.due_date),
     // ClickUp has no cycles. Sprints are plain lists, shown as the list name.
     cycle: null,
+    project: null,
     remoteUpdatedAt: toIso(task.date_updated),
   };
 }

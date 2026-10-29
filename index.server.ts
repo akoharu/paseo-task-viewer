@@ -3,9 +3,11 @@ import { getToken, saveToken } from "./server/credentials";
 import { testClickUp } from "./server/clickup";
 import { delegateTask } from "./server/delegate";
 import { testLinear } from "./server/linear";
+import { getProject, listProjects } from "./server/linear-projects";
 import { createManualTask, deleteTask, updateManualTask } from "./server/manual";
 import { readTasks } from "./server/store";
 import { getSyncState, type SyncPreferences, syncNow } from "./server/sync";
+import { getProjectRpc, listProjectsRpc } from "./shared/projects";
 import { taskViewerSettings } from "./shared/settings";
 import {
   createTaskRpc,
@@ -69,6 +71,9 @@ export default function contribute(server: PluginServerContext) {
   server.handle(updateTaskRpc, updateManualTask);
   server.handle(deleteTaskRpc, deleteTask);
   server.handle(delegateTaskRpc, (input, { paseo }) => delegateTask(input, paseo));
+
+  server.handle(listProjectsRpc, ({ force }) => listProjects(force));
+  server.handle(getProjectRpc, ({ projectId, force }) => getProject(projectId, force));
 
   server.handle(credentialStatusRpc, async () => {
     const [clickup, linear] = await Promise.all([getToken("clickup"), getToken("linear")]);

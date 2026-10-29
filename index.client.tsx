@@ -1,5 +1,8 @@
-import type { PluginClientContext, PluginSidebarItemProps } from "@getpaseo/plugin/client";
+import type { PluginClientContext, PluginScreenProps, PluginSidebarItemProps } from "@getpaseo/plugin/client";
 import { SidebarRow } from "@getpaseo/plugin/client/ui";
+import type { ComponentType } from "react";
+import { OpenScreenContext } from "./client/navigation";
+import { ProjectScreen } from "./client/project-screen";
 import { SettingsScreen } from "./client/settings-screen";
 import { TasksScreen } from "./client/tasks-screen";
 import { syncTasksRpc } from "./shared/tasks";
@@ -8,14 +11,30 @@ function TasksItem({ currentScreen, openScreen }: PluginSidebarItemProps) {
   return (
     <SidebarRow
       icon="ListTodo"
-      active={currentScreen?.screenId === "tasks"}
+      active={currentScreen?.screenId === "tasks" || currentScreen?.screenId === "project"}
       onPress={() => openScreen({ screenId: "tasks" })}
     />
   );
 }
 
 export default function contribute(client: PluginClientContext) {
-  client.addScreen({ id: "tasks", title: "Tasks", Component: TasksScreen });
+  const openScreen: PluginClientContext["openScreen"] = (input) => client.openScreen(input);
+  // Screens get openScreen through context, so a task or project card can open the project screen.
+  const withNavigation = (Screen: ComponentType<PluginScreenProps>) =>
+    function NavigableScreen(props: PluginScreenProps) {
+      return (
+        <OpenScreenContext.Provider value={openScreen}>
+          <Screen {...props} />
+        </OpenScreenContext.Provider>
+      );
+    };
+
+  client.addScreen({ id: "tasks", title: "Tasks", Component: withNavigation(TasksScreen) });
+  client.addScreen({
+    id: "project",
+    title: (params) => params.name || "Project",
+    Component: withNavigation(ProjectScreen),
+  });
   client.addSidebarHeaderItem({ id: "tasks", title: "Tasks", Component: TasksItem });
   client.addSettingsScreen({ id: "connections", title: "Task viewer", icon: "ListTodo", Component: SettingsScreen });
   client.addCommandCenterItem({
@@ -24,8 +43,18 @@ export default function contribute(client: PluginClientContext) {
     icon: "ListTodo",
     keywords: ["clickup", "linear", "tickets"],
     context: "global",
-    onSelect({ openScreen }) {
-      openScreen({ screenId: "tasks" });
+    onSelect({ openScreen: open }) {
+      open({ screenId: "tasks" });
+    },
+  });
+  client.addCommandCenterItem({
+    id: "open-projects",
+    title: "Open Linear projects",
+    icon: "FolderKanban",
+    keywords: ["linear", "projects", "progress"],
+    context: "global",
+    onSelect({ openScreen: open }) {
+      open({ screenId: "tasks", params: { view: "projects" } });
     },
   });
   client.addCommandCenterItem({
@@ -34,9 +63,9 @@ export default function contribute(client: PluginClientContext) {
     icon: "RefreshCw",
     keywords: ["clickup", "linear", "tickets"],
     context: "global",
-    async onSelect({ rpc, openScreen }) {
+    async onSelect({ rpc, openScreen: open }) {
       await rpc(syncTasksRpc, {});
-      openScreen({ screenId: "tasks" });
+      open({ screenId: "tasks" });
     },
   });
   client.addCommandCenterItem({

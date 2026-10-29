@@ -28,6 +28,7 @@ export function createManualTask(input: RpcInput<typeof createTaskRpc>) {
     priorityRank: null,
     dueDate: null,
     cycle: null,
+    project: null,
     createdAt: now,
     updatedAt: now,
     syncedAt: null,

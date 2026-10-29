@@ -1,7 +1,7 @@
 import { type PluginScreenProps, useRpc } from "@getpaseo/plugin/client";
 import { Modal, ScrollView, TextInput, useToast } from "@getpaseo/plugin/client/react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
   createTaskRpc,
@@ -16,7 +16,22 @@ import {
   type TaskListOutput,
   type TaskSource,
 } from "../shared/tasks";
-import { Button, Chip, ChipRow, errorMessage, relativeTime, statusColor, TaskBadges, type Theme } from "./kit";
+import {
+  Button,
+  errorMessage,
+  FilterGroup,
+  IconButton,
+  relativeTime,
+  SearchInput,
+  Segmented,
+  statusColor,
+  TaskBadges,
+  type Theme,
+  Toolbar,
+  UnderlineTabs,
+} from "./kit";
+import { listProjectsRpc } from "../shared/projects";
+import { ProjectsView } from "./projects-view";
 import { TaskDetail } from "./task-detail";
 
 type SourceFilter = "all" | TaskSource;
@@ -24,7 +39,50 @@ type StateFilter = "active" | "done" | "all";
 
 const GROUP_ORDER: StatusGroup[] = ["in_progress", "review", "todo", "done", "canceled"];
 
-export function TasksScreen({ theme, layout, navigation }: PluginScreenProps) {
+type ScreenView = "tasks" | "projects";
+
+export function TasksScreen({ theme, layout, navigation, params }: PluginScreenProps) {
+  const [view, setView] = useState<ScreenView>(params.view === "projects" ? "projects" : "tasks");
+  // Follow a new view param when the screen is opened again, for example from the Command Center.
+  useEffect(() => {
+    if (params.view === "projects" || params.view === "tasks") setView(params.view);
+  }, [params.view]);
+
+  const listTasks = useRpc(listTasksRpc);
+  const listProjects = useRpc(listProjectsRpc);
+  const tasks = useQuery({ queryKey: ["tasks"], queryFn: () => listTasks({}), refetchInterval: 30_000 });
+  // Read the project count from the cache only, so the Tasks tab never calls Linear for it.
+  const projects = useQuery({ queryKey: ["projects-linear"], queryFn: () => listProjects({ force: false }), enabled: false });
+
+  const tabs = (
+    <UnderlineTabs<ScreenView>
+      theme={theme}
+      value={view}
+      onChange={setView}
+      options={[
+        { value: "tasks", label: "My tasks", count: tasks.data?.tasks.filter((task) => isOpenStatus(task.statusGroup)).length },
+        { value: "projects", label: "Projects", count: projects.data?.projects.length },
+      ]}
+    />
+  );
+
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.colors.surface0 }}>
+      {view === "tasks" ? (
+        <MyTasksView theme={theme} layout={layout} navigation={navigation} tabs={tabs} />
+      ) : (
+        <ProjectsView theme={theme} layout={layout} tabs={tabs} />
+      )}
+    </View>
+  );
+}
+
+function MyTasksView({
+  theme,
+  layout,
+  navigation,
+  tabs,
+}: Pick<PluginScreenProps, "theme" | "layout" | "navigation"> & { tabs: ReactNode }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const listTasks = useRpc(listTasksRpc);
@@ -50,18 +108,27 @@ export function TasksScreen({ theme, layout, navigation }: PluginScreenProps) {
   const [adding, setAdding] = useState(false);
 
   const all = tasks.data?.tasks ?? [];
-  const visible = useMemo(() => {
+  const searched = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    return all.filter((task) => {
-      if (source !== "all" && task.source !== source) return false;
-      if (state === "active" && !isOpenStatus(task.statusGroup)) return false;
-      if (state === "done" && isOpenStatus(task.statusGroup)) return false;
-      if (!needle) return true;
-      return [task.title, task.identifier, task.container, task.status]
+    if (!needle) return all;
+    return all.filter((task) =>
+      [task.title, task.identifier, task.container, task.project?.name, task.status]
         .filter(Boolean)
-        .some((value) => (value as string).toLowerCase().includes(needle));
-    });
-  }, [all, source, state, search]);
+        .some((value) => (value as string).toLowerCase().includes(needle)),
+    );
+  }, [all, search]);
+
+  const matchesSource = (task: Task, value: SourceFilter) => value === "all" || task.source === value;
+  const matchesState = (task: Task, value: StateFilter) =>
+    value === "all" || (value === "active" ? isOpenStatus(task.statusGroup) : !isOpenStatus(task.statusGroup));
+  // Each count follows the other filter, so the numbers match what a click would show.
+  const stateCount = (value: StateFilter) => searched.filter((task) => matchesSource(task, source) && matchesState(task, value)).length;
+  const sourceCount = (value: SourceFilter) => searched.filter((task) => matchesState(task, state) && matchesSource(task, value)).length;
+
+  const visible = useMemo(
+    () => searched.filter((task) => matchesSource(task, source) && matchesState(task, state)),
+    [searched, source, state],
+  );
 
   const groups = useMemo(
     () =>
@@ -76,28 +143,65 @@ export function TasksScreen({ theme, layout, navigation }: PluginScreenProps) {
 
   const selected = all.find((task) => task.id === selectedId) ?? null;
   const syncState = tasks.data?.sync;
+  const syncing = Boolean(syncState?.running) || sync.isPending;
+  const syncFailed = (syncState?.errors.length ?? 0) > 0;
   const noCredentials = credentials.data && !credentials.data.clickup.configured && !credentials.data.linear.configured;
   const muted = { color: theme.colors.foregroundMuted, fontSize: 12 };
   const padding = layout.compact ? 16 : 24;
 
+  const actions = (
+    <>
+      {layout.compact ? null : (
+        <Text style={{ ...muted, color: syncFailed ? theme.colors.statusDanger : theme.colors.foregroundMuted }}>
+          {syncing ? "Syncing…" : syncFailed ? "Sync failed" : `Synced ${relativeTime(syncState?.lastRunAt ?? null)}`}
+        </Text>
+      )}
+      <IconButton theme={theme} icon="RefreshCw" label="Sync now" busy={syncing} onPress={() => sync.mutate()} />
+      {layout.compact ? (
+        <IconButton theme={theme} icon="Plus" label="New task" variant="primary" onPress={() => setAdding(true)} />
+      ) : (
+        <Button theme={theme} icon="Plus" label="New task" onPress={() => setAdding(true)} />
+      )}
+    </>
+  );
+
+  const filters = (
+    <>
+      <View style={layout.compact ? { paddingHorizontal: 16 } : { flexGrow: 1, flexBasis: 220, maxWidth: 420 }}>
+        <SearchInput theme={theme} value={search} onChangeText={setSearch} placeholder="Search tasks" />
+      </View>
+      <FilterGroup layout={layout}>
+        <Segmented<StateFilter>
+          theme={theme}
+          label="State"
+          value={state}
+          onChange={setState}
+          options={[
+            { value: "active", label: "Active", count: stateCount("active") },
+            { value: "done", label: "Done", count: stateCount("done") },
+            { value: "all", label: "All", count: stateCount("all") },
+          ]}
+        />
+        <Segmented<SourceFilter>
+          theme={theme}
+          label="Source"
+          value={source}
+          onChange={setSource}
+          options={[
+            { value: "all", label: "All sources" },
+            { value: "clickup", label: "ClickUp", count: sourceCount("clickup") },
+            { value: "linear", label: "Linear", count: sourceCount("linear") },
+            { value: "manual", label: "Manual", count: sourceCount("manual") },
+          ]}
+        />
+      </FilterGroup>
+    </>
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.surface0 }}>
+      <Toolbar theme={theme} layout={layout} tabs={tabs} actions={actions} filters={filters} />
       <ScrollView contentContainerStyle={{ padding, gap: 14 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-          <View style={{ gap: 2 }}>
-            <Text style={{ color: theme.colors.foreground, fontSize: layout.compact ? 20 : 24, fontWeight: "700" }}>Tasks</Text>
-            <Text style={muted}>
-              {syncState?.running || sync.isPending
-                ? "Syncing…"
-                : `Last sync ${relativeTime(syncState?.lastRunAt ?? null)}`}
-            </Text>
-          </View>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Button theme={theme} variant="secondary" label="Sync now" busy={sync.isPending} onPress={() => sync.mutate()} />
-            <Button theme={theme} label="Add task" onPress={() => setAdding(true)} />
-          </View>
-        </View>
-
         {noCredentials ? (
           <Text style={{ color: theme.colors.statusWarning }}>
             ClickUp and Linear are not connected. Open Settings → Plugins → task-viewer to add your API tokens. Manual tasks work without them.
@@ -109,39 +213,6 @@ export function TasksScreen({ theme, layout, navigation }: PluginScreenProps) {
           </Text>
         ))}
         {tasks.error ? <Text style={{ color: theme.colors.statusDanger }}>{errorMessage(tasks.error)}</Text> : null}
-
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search by title, ID, list, or status"
-          placeholderTextColor={theme.colors.foregroundMuted}
-          autoCapitalize="none"
-          style={{
-            color: theme.colors.foreground,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            borderRadius: 8,
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-            backgroundColor: theme.colors.surface1,
-          }}
-        />
-        <ChipRow>
-          {(["all", "clickup", "linear", "manual"] as const).map((value) => (
-            <Chip
-              key={value}
-              theme={theme}
-              label={value === "all" ? "All sources" : SOURCE_LABELS[value]}
-              selected={source === value}
-              onPress={() => setSource(value)}
-            />
-          ))}
-        </ChipRow>
-        <ChipRow>
-          <Chip theme={theme} label="Active" selected={state === "active"} onPress={() => setState("active")} />
-          <Chip theme={theme} label="Done" selected={state === "done"} onPress={() => setState("done")} />
-          <Chip theme={theme} label="All" selected={state === "all"} onPress={() => setState("all")} />
-        </ChipRow>
 
         {tasks.isPending ? <Text style={muted}>Loading tasks…</Text> : null}
         {!tasks.isPending && groups.length === 0 ? <Text style={muted}>No tasks match these filters.</Text> : null}
@@ -166,7 +237,7 @@ export function TasksScreen({ theme, layout, navigation }: PluginScreenProps) {
         </Modal.Content>
       </Modal>
 
-      <Modal title="Add task" open={adding} onOpenChange={setAdding}>
+      <Modal title="New task" open={adding} onOpenChange={setAdding}>
         <Modal.Content>
           <AddTaskForm
             theme={theme}
@@ -185,7 +256,7 @@ export function TasksScreen({ theme, layout, navigation }: PluginScreenProps) {
 }
 
 function TaskRow({ theme, task, onPress }: { theme: Theme; task: Task; onPress(): void }) {
-  const meta = [SOURCE_LABELS[task.source], task.identifier, task.container].filter(Boolean).join(" · ");
+  const meta = [SOURCE_LABELS[task.source], task.identifier, task.project?.name ?? task.container].filter(Boolean).join(" · ");
   return (
     <Pressable
       accessibilityRole="button"

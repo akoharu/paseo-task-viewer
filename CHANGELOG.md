@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 - 2026-10-29
+
+- New Projects tab: active Linear projects you lead, are a member of, or have open issues in. Each card shows status, health, progress, open issues per stage, target date (with overdue and due-soon highlights), lead, your open issues, and unassigned issues. Projects that need attention come first. Projects with no open issues are in a collapsed section.
+- New project screen: every issue in the project grouped by stage and sorted by priority and due date, with search and filters (open, done, all; everyone, mine, unassigned), milestones, and a link to Linear. Issues assigned to you open the full task view with delegation.
+- Linear tasks show their project name and have an Open project button.
+- New Command Center item: Open Linear projects.
+- Redesigned header: a sticky toolbar with underline tabs (My tasks, Projects) and counts, sync status and actions on the right, and one filter row with search and segmented filters that show counts. On narrow screens the actions become icon buttons and the filters scroll sideways.
+
 ## 0.2.0 - 2026-10-29
 
 - Show the priority of each task (urgent, high, normal or medium, low) as a colored badge.

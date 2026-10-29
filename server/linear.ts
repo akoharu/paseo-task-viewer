@@ -7,6 +7,7 @@ const API = "https://api.linear.app/graphql";
 const ISSUE_FIELDS = `
   id identifier title description url priority priorityLabel dueDate updatedAt
   cycle { number name startsAt endsAt }
+  project { id name }
   state { name type color }
   team { key name states { nodes { name type position } } }
 `;
@@ -27,6 +28,7 @@ const issueSchema = z.object({
     .optional(),
   dueDate: z.string().nullable().optional(),
   updatedAt: z.string(),
+  project: z.object({ id: z.string(), name: z.string() }).nullable().optional(),
   state: stateSchema,
   team: z.object({
     key: z.string(),
@@ -38,7 +40,7 @@ const issueSchema = z.object({
 });
 type LinearIssue = z.infer<typeof issueSchema>;
 
-function client(token: string) {
+export function linearClient(token: string) {
   return async (query: string, variables: Record<string, unknown>) => {
     const body = z
       .object({
@@ -76,7 +78,7 @@ function groupFor(type: string): StatusGroup {
 }
 
 // Linear has no review type, so a started state named like "In Review" or "Merge Request" counts as review.
-function groupForState(state: { name: string; type: string }): StatusGroup {
+export function groupForState(state: { name: string; type: string }): StatusGroup {
   return state.type === "started" && looksLikeReview(state.name) ? "review" : groupFor(state.type);
 }
 
@@ -104,12 +106,13 @@ function toTicket(issue: LinearIssue): RemoteTicket {
           endsAt: issue.cycle.endsAt,
         }
       : null,
+    project: issue.project ? { id: issue.project.id, name: issue.project.name } : null,
     remoteUpdatedAt: issue.updatedAt,
   };
 }
 
 export async function fetchLinear(token: string, teamKeys: string[]) {
-  const query = client(token);
+  const query = linearClient(token);
   const filter: Record<string, unknown> = {
     state: { type: { nin: ["completed", "canceled", "duplicate"] } },
   };
@@ -164,6 +167,6 @@ export async function fetchLinear(token: string, teamKeys: string[]) {
 export async function testLinear(token: string): Promise<string> {
   const data = z
     .object({ viewer: z.object({ name: z.string(), email: z.string().optional() }) })
-    .parse(await client(token)("query { viewer { name email } }", {}));
+    .parse(await linearClient(token)("query { viewer { name email } }", {}));
   return `Connected to Linear as ${data.viewer.name}.`;
 }
