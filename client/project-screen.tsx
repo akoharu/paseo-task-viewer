@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { getProjectRpc, type ProjectIssue } from "../shared/projects";
-import { isOpenStatus, listTasksRpc, STATUS_GROUP_LABELS, type StatusGroup } from "../shared/tasks";
+import { isOpenStatus, listTasksRpc, parseDueDate, STATUS_GROUP_LABELS, type StatusGroup } from "../shared/tasks";
 import {
   Badge,
   Button,
@@ -15,6 +15,7 @@ import {
   relativeTime,
   SearchInput,
   Segmented,
+  shortDate,
   statusColor,
   TaskBadges,
   type Theme,
@@ -111,7 +112,7 @@ export function ProjectScreen({ theme, layout, navigation, params }: PluginScree
             </Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
               <Badge label={project.statusName} color={statusTypeColor(theme, project.statusType)} />
-              {project.startDate ? <Badge label={`Started ${project.startDate}`} color={theme.colors.foregroundMuted} /> : null}
+              {project.startDate ? <Badge label={`Started ${shortDate(parseDueDate(project.startDate))}`} color={theme.colors.foregroundMuted} /> : null}
             </View>
             <ProjectBadges theme={theme} project={project} />
             <ProgressBar theme={theme} value={project.progress} height={8} />
@@ -228,7 +229,8 @@ export function ProjectScreen({ theme, layout, navigation, params }: PluginScree
 }
 
 function IssueRow({ theme, issue, onPress }: { theme: Theme; issue: ProjectIssue; onPress(): void }) {
-  const meta = [issue.identifier, issue.assigneeName ?? "Unassigned", issue.milestone].filter(Boolean).join(" · ");
+  const assignee = issue.assigneeName ? `${issue.assigneeName}${issue.assignedToMe ? " (you)" : ""}` : "Unassigned";
+  const meta = [issue.identifier, assignee, issue.milestone].filter(Boolean).join(" · ");
   return (
     <Pressable
       accessibilityRole="button"
@@ -252,7 +254,6 @@ function IssueRow({ theme, issue, onPress }: { theme: Theme; issue: ProjectIssue
         </Text>
         <Text numberOfLines={1} style={{ color: issue.assigneeName ? theme.colors.foregroundMuted : theme.colors.statusWarning, fontSize: 12 }}>
           {meta}
-          {issue.assignedToMe ? " (you)" : ""}
         </Text>
         <TaskBadges theme={theme} task={issue} />
       </View>

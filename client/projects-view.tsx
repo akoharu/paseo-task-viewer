@@ -169,8 +169,9 @@ export function ProjectsView({ theme, layout, tabs }: Pick<PluginSurfaceProps, "
       ) : null}
       {projects.data ? (
         <Text style={muted}>
-          {attention > 0 ? `${attention} need attention · ` : ""}
-          {myOpen} open issues are yours · Linear projects you lead, are a member of, or have issues in
+          {attention > 0 ? `${attention} ${attention === 1 ? "needs" : "need"} attention · ` : ""}
+          {myOpen === 1 ? "1 open issue is yours" : `${myOpen} open issues are yours`} · Linear projects you lead, are a
+          member of, or have issues in
         </Text>
       ) : null}
 

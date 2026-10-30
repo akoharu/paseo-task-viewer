@@ -3,7 +3,13 @@
   "name": "Task viewer",
   "description": "See your ClickUp tasks, Linear issues, and manual tasks in Paseo, and hand any of them to a coding agent",
   "icon": "assets/icon.png",
-  "media": [],
+  "media": [
+    "assets/screenshots/tasks.png",
+    "assets/screenshots/projects.png",
+    "assets/screenshots/project.png",
+    "assets/screenshots/task-detail.png",
+    "assets/screenshots/mobile.png"
+  ],
   "requirements": {
     "paseo": ">=0.12.0"
   }

@@ -2,7 +2,7 @@ import { defineSettings } from "@getpaseo/plugin";
 import { z } from "zod";
 
 // Non-secret preferences. API tokens are stored separately on the daemon and never sent to clients.
-const preferencesSchema = z.object({
+export const preferencesSchema = z.object({
   clickupEnabled: z.boolean().default(true),
   // Comma-separated ClickUp workspace (team) IDs. Empty means every workspace the token can see.
   clickupTeamIds: z.string().default(""),
@@ -18,6 +18,8 @@ const preferencesSchema = z.object({
   defaultMode: z.enum(["local", "worktree"]).default("worktree"),
   // Pre-filled as extra instructions in every delegation form.
   agentInstructions: z.string().default(""),
+  // Shows fictional sample data instead of your real tasks and projects, for screenshots and trying the plugin.
+  demoMode: z.boolean().default(false),
 });
 export type Preferences = z.infer<typeof preferencesSchema>;
 
@@ -34,3 +36,6 @@ export function splitList(value: string): string[] {
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
 }
+
+// Fictional repositories shown in the delegate form in demo mode, so screenshots do not show real project names.
+export const DEMO_REPOSITORIES = ["acme/billing-service", "acme/mobile-app", "acme/web"];

@@ -187,10 +187,12 @@ export function suggestBranchName(task: Pick<Task, "identifier" | "title">): str
   const slug = base
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60)
-    .replace(/-+$/g, "");
-  return slug || "task";
+    .replace(/^-+|-+$/g, "");
+  if (slug.length <= 60) return slug || "task";
+  // Cut at the last whole word that fits, not in the middle of a word.
+  const cut = slug.slice(0, 61);
+  const lastHyphen = cut.lastIndexOf("-");
+  return (lastHyphen > 0 ? cut.slice(0, lastHyphen) : slug.slice(0, 60)).replace(/-+$/g, "");
 }
 
 export type CycleState = "current" | "past" | "upcoming";

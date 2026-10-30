@@ -29,6 +29,7 @@ export function SettingsScreen({ theme }: PluginSurfaceProps) {
       <CredentialSection provider="clickup" theme={theme} />
       <CredentialSection provider="linear" theme={theme} />
       <PreferencesSection />
+      <DemoSection />
     </View>
   );
 }
@@ -223,6 +224,28 @@ function PreferencesSection() {
           actionLabel={settings.saving ? "Saving…" : "Save"}
           disabled={!draft || settings.saving}
           onPress={() => void saveDraft()}
+        />
+      </SettingsCard>
+    </SettingsSection>
+  );
+}
+
+function DemoSection() {
+  const settings = useSettings(taskViewerSettings);
+  const toast = useToast();
+  if (settings.status !== "ready") return null;
+  return (
+    <SettingsSection title="Demo">
+      <SettingsCard>
+        <SettingsSwitch
+          label="Show demo data"
+          hint="Shows a fictional company instead of your real tasks and projects, for screenshots or to try the plugin. Editing and delegation are off while it is on. Your real data is not changed."
+          value={settings.values.demoMode}
+          disabled={settings.saving}
+          onValueChange={async (demoMode) => {
+            const ok = await settings.save({ ...settings.values, demoMode }, settings.revision);
+            if (!ok) toast.error("Could not save. Reload and try again.");
+          }}
         />
       </SettingsCard>
     </SettingsSection>

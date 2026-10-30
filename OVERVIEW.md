@@ -12,6 +12,8 @@ When you delegate a task, you choose a project, a new worktree or the local chec
 
 Open Settings, then Plugins, then Task viewer. Paste a ClickUp personal API token (it starts with pk_) and a Linear personal API key, then use Test to check each one. You can also set CLICKUP_API_TOKEN and LINEAR_API_KEY in the environment of the Paseo daemon. You can connect one service, both, or none. Manual tasks work without any account.
 
+To try the plugin before you connect an account, turn on Show demo data in the same settings screen. It shows a fictional company with tasks and projects. Editing and delegation are off while it is on, and your real tasks are not changed.
+
 If you want agents to update ticket status, give the agent provider access to ClickUp or Linear, for example with an MCP server. Without that access, the agent still does the coding work and reports that it could not update the ticket.
 
 Requires Paseo 0.12.0 or later. Tested on a macOS daemon with the Paseo desktop app. The interface uses only React Native components, so it is built to run in the web and mobile apps too.

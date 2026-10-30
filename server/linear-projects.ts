@@ -73,11 +73,11 @@ async function requireClient() {
   return linearClient(credential.token);
 }
 
-function emptyCounts(): ProjectCounts {
+export function emptyCounts(): ProjectCounts {
   return { total: 0, todo: 0, inProgress: 0, review: 0, done: 0, canceled: 0, mine: 0, unassigned: 0 };
 }
 
-function addToCounts(counts: ProjectCounts, group: StatusGroup, assignee: { isMe: boolean } | null | undefined) {
+export function addToCounts(counts: ProjectCounts, group: StatusGroup, assignee: { isMe: boolean } | null | undefined) {
   counts.total += 1;
   if (group === "todo") counts.todo += 1;
   else if (group === "in_progress") counts.inProgress += 1;

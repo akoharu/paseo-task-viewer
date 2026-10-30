@@ -3,7 +3,7 @@ import { TextInput, useToast } from "@getpaseo/plugin/client/react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
-import { taskViewerSettings } from "../shared/settings";
+import { DEMO_REPOSITORIES, taskViewerSettings } from "../shared/settings";
 import {
   type DelegationMode,
   delegateTaskRpc,
@@ -16,6 +16,7 @@ import {
   type TaskListOutput,
   updateTaskRpc,
 } from "../shared/tasks";
+import { useDemoMode } from "./demo";
 import { openProjectInput, useOpenScreen } from "./navigation";
 import { Button, Chip, ChipRow, errorMessage, Label, relativeTime, statusColor, TaskBadges, type Theme } from "./kit";
 
@@ -190,10 +191,25 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
   const settings = useSettings(taskViewerSettings);
   const delegate = useRpc(delegateTaskRpc);
 
-  const projects = useQuery({
+  const demo = useDemoMode();
+  const realProjects = useQuery({
     queryKey: ["projects"],
     queryFn: async () => (await paseo.projects.list()).projects.filter((project) => project.projectKind === "git"),
+    enabled: !demo,
   });
+  // In demo mode, show fictional repositories so screenshots do not reveal real project names.
+  const projects = demo
+    ? {
+        isPending: false,
+        error: null,
+        data: DEMO_REPOSITORIES.map((name) => ({
+          projectId: `demo-${name}`,
+          projectDisplayName: name,
+          projectCustomName: null as string | null,
+          projectRootPath: `/demo/${name}`,
+        })),
+      }
+    : realProjects;
   const providers = useQuery({
     queryKey: ["providers"],
     queryFn: async () => {

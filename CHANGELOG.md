@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 - 2026-10-30
+
+- Demo mode: a Show demo data switch in Task viewer settings shows a fictional company (tasks, Linear projects, and project issues, with dates relative to today) instead of your real data. Editing and delegation are off while it is on. The delegate form shows fictional repositories.
+- Screenshots in the README and in the plugin manifest, taken with demo data.
+- Suggested branch names are cut at a whole word instead of in the middle of a word.
+- Project screen: "(you)" follows your name, and the start date uses the same short format as other dates.
+- Projects tab: "1 needs attention" and "1 open issue is yours" read correctly for one item.
+
 ## 0.3.0 - 2026-10-29
 
 - New Projects tab: active Linear projects you lead, are a member of, or have open issues in. Each card shows status, health, progress, open issues per stage, target date (with overdue and due-soon highlights), lead, your open issues, and unassigned issues. Projects that need attention come first. Projects with no open issues are in a collapsed section.

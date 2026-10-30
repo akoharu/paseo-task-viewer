@@ -1,14 +1,15 @@
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { getToken, saveToken } from "./server/credentials";
+import { demoProject, demoProjectList, demoTasks } from "./server/demo";
 import { testClickUp } from "./server/clickup";
 import { delegateTask } from "./server/delegate";
 import { testLinear } from "./server/linear";
 import { getProject, listProjects } from "./server/linear-projects";
 import { createManualTask, deleteTask, updateManualTask } from "./server/manual";
 import { readTasks } from "./server/store";
-import { getSyncState, type SyncPreferences, syncNow } from "./server/sync";
+import { getSyncState, syncNow } from "./server/sync";
 import { getProjectRpc, listProjectsRpc } from "./shared/projects";
-import { taskViewerSettings } from "./shared/settings";
+import { type Preferences, preferencesSchema, taskViewerSettings } from "./shared/settings";
 import {
   createTaskRpc,
   credentialStatusRpc,
@@ -21,18 +22,11 @@ import {
   updateTaskRpc,
 } from "./shared/tasks";
 
-const DEFAULT_PREFERENCES: SyncPreferences & { syncIntervalMinutes: number } = {
-  clickupEnabled: true,
-  clickupTeamIds: "",
-  clickupListIds: "",
-  linearEnabled: true,
-  linearTeamKeys: "",
-  syncIntervalMinutes: 15,
-};
+const DEMO_READ_ONLY = "Demo data is on, so editing and delegation are off. Turn it off in Task viewer settings.";
 
 export default function contribute(server: PluginServerContext) {
   const settings = server.registerSettings(taskViewerSettings);
-  let preferences = DEFAULT_PREFERENCES;
+  let preferences: Preferences = preferencesSchema.parse({});
   let timer: ReturnType<typeof setInterval> | null = null;
   let firstSync: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
@@ -60,20 +54,29 @@ export default function contribute(server: PluginServerContext) {
     if (!stopped && preferences.syncIntervalMinutes > 0) firstSync = setTimeout(runSync, 5_000);
   });
 
-  const listResult = async () => ({ tasks: await readTasks(), sync: getSyncState() });
+  const listResult = async () =>
+    preferences.demoMode
+      ? { tasks: demoTasks(), sync: { running: false, lastRunAt: new Date().toISOString(), lastSuccessAt: new Date().toISOString(), errors: [] } }
+      : { tasks: await readTasks(), sync: getSyncState() };
+  // Demo data never reaches the real task store, and no agent starts from a fictional ticket.
+  const notInDemo = () => {
+    if (preferences.demoMode) throw new Error(DEMO_READ_ONLY);
+  };
 
   server.handle(listTasksRpc, listResult);
   server.handle(syncTasksRpc, async () => {
-    await syncNow(preferences);
+    if (!preferences.demoMode) await syncNow(preferences);
     return listResult();
   });
-  server.handle(createTaskRpc, createManualTask);
-  server.handle(updateTaskRpc, updateManualTask);
-  server.handle(deleteTaskRpc, deleteTask);
-  server.handle(delegateTaskRpc, (input, { paseo }) => delegateTask(input, paseo));
+  server.handle(createTaskRpc, (input) => (notInDemo(), createManualTask(input)));
+  server.handle(updateTaskRpc, (input) => (notInDemo(), updateManualTask(input)));
+  server.handle(deleteTaskRpc, (input) => (notInDemo(), deleteTask(input)));
+  server.handle(delegateTaskRpc, (input, { paseo }) => (notInDemo(), delegateTask(input, paseo)));
 
-  server.handle(listProjectsRpc, ({ force }) => listProjects(force));
-  server.handle(getProjectRpc, ({ projectId, force }) => getProject(projectId, force));
+  server.handle(listProjectsRpc, ({ force }) => (preferences.demoMode ? demoProjectList() : listProjects(force)));
+  server.handle(getProjectRpc, ({ projectId, force }) =>
+    preferences.demoMode ? demoProject(projectId) : getProject(projectId, force),
+  );
 
   server.handle(credentialStatusRpc, async () => {
     const [clickup, linear] = await Promise.all([getToken("clickup"), getToken("linear")]);

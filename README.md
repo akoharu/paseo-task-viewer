@@ -4,6 +4,16 @@ A [Paseo](https://paseo.sh) plugin that shows your ClickUp tasks, Linear issues,
 
 <p align="center"><img src="assets/icon.png" width="96" alt="Task viewer icon"></p>
 
+![My tasks: ClickUp, Linear, and manual tasks with priority, due date, and cycle](assets/screenshots/tasks.png)
+
+| Linear projects | Project issues |
+| --- | --- |
+| ![Projects tab with progress, health, and target dates](assets/screenshots/projects.png) | ![Project screen with milestones and every issue](assets/screenshots/project.png) |
+| **Task detail and delegation** | **Mobile** |
+| ![Task detail with an attached agent and the delegate form](assets/screenshots/task-detail.png) | <img src="assets/screenshots/mobile.png" width="280" alt="My tasks on a phone"> |
+
+Screenshots use the built-in demo data. All names in them are fictional.
+
 ## Features
 
 - **One list for all your work.** ClickUp tasks and Linear issues assigned to you, plus manual tasks (for example a request from a Slack thread). Filter by source and state, and search.
@@ -40,7 +50,8 @@ Paseo plugins are trusted, unsandboxed code. Please read the source before you i
 
    Instead, you can set `CLICKUP_API_TOKEN` and `LINEAR_API_KEY` in the daemon environment. A saved token takes priority over an environment variable.
 3. Open **Tasks** in the sidebar. Switch between **My tasks** and **Projects** at the top.
-4. Optional: limit the sync to some ClickUp workspaces or lists, or to some Linear team keys, and set your default agent provider, model, and delegation mode.
+4. Optional: turn on **Show demo data** in the same settings screen to try the plugin with a fictional company before you connect any account. Editing and delegation are off while it is on, and your real data is not changed.
+5. Optional: limit the sync to some ClickUp workspaces or lists, or to some Linear team keys, and set your default agent provider, model, and delegation mode.
 
 ## How delegation works
 

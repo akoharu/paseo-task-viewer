@@ -32,6 +32,7 @@ import {
 } from "./kit";
 import { listProjectsRpc } from "../shared/projects";
 import { ProjectsView } from "./projects-view";
+import { useDemoMode } from "./demo";
 import { TaskDetail } from "./task-detail";
 
 type SourceFilter = "all" | TaskSource;
@@ -48,6 +49,7 @@ export function TasksScreen({ theme, layout, navigation, params }: PluginScreenP
     if (params.view === "projects" || params.view === "tasks") setView(params.view);
   }, [params.view]);
 
+  useDemoMode();
   const listTasks = useRpc(listTasksRpc);
   const listProjects = useRpc(listProjectsRpc);
   const tasks = useQuery({ queryKey: ["tasks"], queryFn: () => listTasks({}), refetchInterval: 30_000 });
@@ -92,6 +94,7 @@ function MyTasksView({
   // Poll so scheduled syncs on the daemon show up without a manual refresh.
   const tasks = useQuery({ queryKey: ["tasks"], queryFn: () => listTasks({}), refetchInterval: 30_000 });
   const credentials = useQuery({ queryKey: ["credentials"], queryFn: () => credentialStatus({}) });
+  const demo = useDemoMode();
   const sync = useMutation({
     mutationFn: () => syncTasks({}),
     onSuccess: (data) => {
@@ -145,7 +148,8 @@ function MyTasksView({
   const syncState = tasks.data?.sync;
   const syncing = Boolean(syncState?.running) || sync.isPending;
   const syncFailed = (syncState?.errors.length ?? 0) > 0;
-  const noCredentials = credentials.data && !credentials.data.clickup.configured && !credentials.data.linear.configured;
+  const noCredentials =
+    !demo && credentials.data && !credentials.data.clickup.configured && !credentials.data.linear.configured;
   const muted = { color: theme.colors.foregroundMuted, fontSize: 12 };
   const padding = layout.compact ? 16 : 24;
 
@@ -153,7 +157,7 @@ function MyTasksView({
     <>
       {layout.compact ? null : (
         <Text style={{ ...muted, color: syncFailed ? theme.colors.statusDanger : theme.colors.foregroundMuted }}>
-          {syncing ? "Syncing…" : syncFailed ? "Sync failed" : `Synced ${relativeTime(syncState?.lastRunAt ?? null)}`}
+          {demo ? "Demo data" : syncing ? "Syncing…" : syncFailed ? "Sync failed" : `Synced ${relativeTime(syncState?.lastRunAt ?? null)}`}
         </Text>
       )}
       <IconButton theme={theme} icon="RefreshCw" label="Sync now" busy={syncing} onPress={() => sync.mutate()} />
