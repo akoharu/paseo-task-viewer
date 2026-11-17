@@ -21,23 +21,32 @@ export function statusColor(theme: Theme, group: StatusGroup): string {
   }
 }
 
+// Mode icons Paseo uses today. Other names are not drawn, because an unknown icon name can break the form.
+const KNOWN_CHIP_ICONS = new Set(["Shield", "ShieldCheck", "ShieldEllipsis", "ShieldOff", "ShieldPlus", "ShieldAlert"]);
+
 export function Chip({
   theme,
   label,
   selected,
   onPress,
+  icon,
 }: {
   theme: Theme;
   label: string;
   selected: boolean;
   onPress(): void;
+  icon?: string;
 }) {
+  const color = selected ? theme.colors.accentForeground : theme.colors.foreground;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
       style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
         paddingHorizontal: 10,
         paddingVertical: 5,
         borderRadius: 999,
@@ -46,9 +55,8 @@ export function Chip({
         backgroundColor: selected ? theme.colors.accent : "transparent",
       }}
     >
-      <Text style={{ fontSize: 12, color: selected ? theme.colors.accentForeground : theme.colors.foreground }}>
-        {label}
-      </Text>
+      {icon && KNOWN_CHIP_ICONS.has(icon) ? <Icon name={icon} size={13} color={color} /> : null}
+      <Text style={{ fontSize: 12, color }}>{label}</Text>
     </Pressable>
   );
 }

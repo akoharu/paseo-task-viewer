@@ -155,7 +155,9 @@ export function TaskDetail({ theme, layout, navigation, task, onClose }: Props) 
                   {assignment.projectName} · {assignment.mode === "worktree" ? "Worktree" : "Local"}
                 </Text>
                 <Text style={muted}>
-                  {[assignment.branch, assignment.provider, relativeTime(assignment.createdAt)].filter(Boolean).join(" · ")}
+                  {[assignment.branch, assignment.provider, assignment.thinkingLabel, assignment.modeLabel, relativeTime(assignment.createdAt)]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </Text>
               </View>
               {navigation ? (
@@ -210,24 +212,7 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
         })),
       }
     : realProjects;
-  const providers = useQuery({
-    queryKey: ["providers"],
-    queryFn: async () => {
-      const snapshot = await paseo.providers.snapshot();
-      const compactModels = new Map(
-        (snapshot.compactSnapshot?.entries ?? []).map((entry) => [entry.provider, entry.models ?? []]),
-      );
-      return snapshot.entries
-        .filter((entry) => entry.status === "ready" && entry.enabled !== false)
-        .map((entry) => ({
-          id: entry.provider,
-          label: entry.label ?? entry.provider,
-          models: (entry.models?.length ? entry.models : (compactModels.get(entry.provider) ?? []))
-            .filter((model) => model.isSelectable !== false)
-            .map((model) => ({ id: model.id, label: model.label, isDefault: model.isDefault === true })),
-        }));
-    },
-  });
+  const providers = useQuery({ queryKey: ["providers"], queryFn: async () => readProviders(await paseo.providers.snapshot()) });
 
   const [projectId, setProjectId] = useState<string | null>(null);
   const [mode, setMode] = useState<DelegationMode>("worktree");
@@ -235,6 +220,9 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
   const [baseBranch, setBaseBranch] = useState("");
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
+  // Explicit picks. Null means "use the last-used value if this provider supports it, else the default".
+  const [permissionPick, setPermissionPick] = useState<string | null>(null);
+  const [thinkingPick, setThinkingPick] = useState<string | null>(null);
   const [extra, setExtra] = useState("");
   const [initialized, setInitialized] = useState(false);
 
@@ -251,6 +239,14 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
   const selectedProvider = providers.data?.find((entry) => entry.id === provider);
   const project = projects.data?.find((entry) => entry.projectId === projectId);
   const visibleModels = useMemo(() => (selectedProvider?.models ?? []).slice(0, 12), [selectedProvider]);
+  // "Default model" uses the provider's default model, so its thinking levels apply.
+  const selectedModel = selectedProvider?.models.find((entry) => (model ? entry.id === model : entry.isDefault)) ?? selectedProvider?.models[0];
+
+  const remembered = settings.status === "ready" ? settings.values : null;
+  const permission = pickValid(selectedProvider?.modes ?? [], permissionPick, remembered?.defaultPermissionModeId, selectedProvider?.defaultModeId);
+  const thinking = pickValid(selectedModel?.thinking ?? [], thinkingPick, remembered?.defaultThinkingOptionId, selectedModel?.defaultThinkingId);
+  const permissionMode = selectedProvider?.modes.find((entry) => entry.id === permission);
+  const thinkingOption = selectedModel?.thinking.find((entry) => entry.id === thinking);
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -265,11 +261,29 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
         baseBranch: baseBranch.trim(),
         provider,
         model,
+        modeId: permission,
+        modeLabel: permissionMode?.label ?? "",
+        thinkingOptionId: thinking,
+        thinkingLabel: thinkingOption?.label ?? "",
         extraInstructions: extra,
       });
     },
     onSuccess: (result) => {
       queryClient.setQueryData<TaskListOutput>(["tasks"], (old) => replaceTask(old, result.task));
+      // Remember this setup, so the next task starts with the same agent choices.
+      if (settings.status === "ready") {
+        void settings.save(
+          {
+            ...settings.values,
+            defaultMode: mode,
+            defaultProvider: provider,
+            defaultModel: model,
+            defaultPermissionModeId: permission || settings.values.defaultPermissionModeId,
+            defaultThinkingOptionId: thinking || settings.values.defaultThinkingOptionId,
+          },
+          settings.revision,
+        );
+      }
       toast.show("Agent started", { variant: "success" });
       onStarted(result.agentId);
     },
@@ -356,19 +370,74 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
               onPress={() => {
                 setProvider(entry.id);
                 setModel("");
+                setPermissionPick(null);
+                setThinkingPick(null);
               }}
             />
           ))}
         </ChipRow>
         {visibleModels.length > 0 ? (
           <ChipRow>
-            <Chip theme={theme} label="Default model" selected={model === ""} onPress={() => setModel("")} />
+            <Chip
+              theme={theme}
+              label="Default model"
+              selected={model === ""}
+              onPress={() => {
+                setModel("");
+                setThinkingPick(null);
+              }}
+            />
             {visibleModels.map((entry) => (
-              <Chip key={entry.id} theme={theme} label={entry.label} selected={entry.id === model} onPress={() => setModel(entry.id)} />
+              <Chip
+                key={entry.id}
+                theme={theme}
+                label={entry.label}
+                selected={entry.id === model}
+                onPress={() => {
+                  setModel(entry.id);
+                  setThinkingPick(null);
+                }}
+              />
             ))}
           </ChipRow>
         ) : null}
       </View>
+
+      {selectedModel && selectedModel.thinking.length > 0 ? (
+        <View style={{ gap: 6 }}>
+          <Label theme={theme}>Thinking</Label>
+          <ChipRow>
+            {selectedModel.thinking.map((entry) => (
+              <Chip
+                key={entry.id}
+                theme={theme}
+                label={entry.label}
+                selected={entry.id === thinking}
+                onPress={() => setThinkingPick(entry.id)}
+              />
+            ))}
+          </ChipRow>
+        </View>
+      ) : null}
+
+      {selectedProvider && selectedProvider.modes.length > 0 ? (
+        <View style={{ gap: 6 }}>
+          <Label theme={theme}>Mode</Label>
+          <ChipRow>
+            {selectedProvider.modes.map((entry) => (
+              <Chip
+                key={entry.id}
+                theme={theme}
+                icon={entry.icon}
+                label={entry.label}
+                selected={entry.id === permission}
+                onPress={() => setPermissionPick(entry.id)}
+              />
+            ))}
+          </ChipRow>
+          {permissionMode?.description ? <Text style={muted}>{permissionMode.description}</Text> : null}
+        </View>
+      ) : null}
 
       <View style={{ gap: 6 }}>
         <Label theme={theme}>Extra instructions (optional)</Label>
@@ -397,4 +466,54 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
       </View>
     </View>
   );
+}
+
+type Option = { id: string; label: string; description?: string; icon?: string };
+type ProviderSnapshot = Awaited<ReturnType<ReturnType<typeof usePaseo>["providers"]["snapshot"]>>;
+
+// Providers that can start agents, with their modes, models, and each model's thinking levels.
+// Paseo can send models in full form or in a compact form that points to shared thinking sets.
+function readProviders(snapshot: ProviderSnapshot) {
+  const sets = snapshot.compactSnapshot?.thinkingSets ?? [];
+  const compact = new Map((snapshot.compactSnapshot?.entries ?? []).map((entry) => [entry.provider, entry.models ?? []]));
+  return snapshot.entries
+    .filter((entry) => entry.status === "ready" && entry.enabled !== false)
+    .map((entry) => {
+      const full = entry.models ?? [];
+      const models = full.length
+        ? full.map((model) => ({
+            id: model.id,
+            label: model.label,
+            isSelectable: model.isSelectable,
+            isDefault: model.isDefault === true,
+            thinking: (model.thinkingOptions ?? []) as Option[],
+            defaultThinkingId: model.defaultThinkingOptionId ?? model.thinkingOptions?.find((option) => option.isDefault)?.id,
+          }))
+        : (compact.get(entry.provider) ?? []).map((model) => {
+            const set = model.thinkingSet === undefined ? undefined : sets[model.thinkingSet];
+            return {
+              id: model.id,
+              label: model.label,
+              isSelectable: model.isSelectable,
+              isDefault: model.isDefault === true,
+              thinking: (set?.options ?? []) as Option[],
+              defaultThinkingId: set?.defaultOptionId ?? set?.options.find((option) => option.isDefault)?.id,
+            };
+          });
+      return {
+        id: entry.provider,
+        label: entry.label ?? entry.provider,
+        modes: (entry.modes ?? []) as Option[],
+        defaultModeId: entry.defaultModeId ?? undefined,
+        models: models.filter((model) => model.isSelectable !== false),
+      };
+    });
+}
+
+// The explicit pick, then the remembered value, then the default, using the first one this list contains.
+function pickValid(options: Option[], ...candidates: (string | null | undefined)[]): string {
+  for (const candidate of candidates) {
+    if (candidate && options.some((option) => option.id === candidate)) return candidate;
+  }
+  return "";
 }

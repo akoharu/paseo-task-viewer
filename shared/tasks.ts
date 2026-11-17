@@ -24,6 +24,9 @@ export const assignmentSchema = z.object({
   mode: delegationModeSchema,
   branch: z.string().nullable(),
   provider: z.string(),
+  // Labels of the permission mode and thinking level the agent started with. Null for older agents.
+  modeLabel: z.string().nullable().default(null),
+  thinkingLabel: z.string().nullable().default(null),
   createdAt: z.string(),
 });
 export type Assignment = z.infer<typeof assignmentSchema>;
@@ -132,6 +135,12 @@ export const delegateTaskRpc = defineRpc({
     baseBranch: z.string().trim(),
     provider: z.string().min(1),
     model: z.string(),
+    // Provider mode such as "plan" or "bypassPermissions", and model thinking level such as "high".
+    // Empty means the provider or model default.
+    modeId: z.string(),
+    modeLabel: z.string(),
+    thinkingOptionId: z.string(),
+    thinkingLabel: z.string(),
     extraInstructions: z.string(),
   }),
   output: z.object({ agentId: z.string(), workspaceId: z.string(), task: taskSchema }),

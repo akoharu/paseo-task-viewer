@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 - 2026-11-17
+
+- Delegate form: choose the thinking level and the mode (for example Plan mode, Always ask, Accept file edits, Auto mode, or Bypass) for the agent. The options come from the selected provider and model, with their defaults selected, and mode chips use the same icons as Paseo.
+- The last provider, model, thinking level, mode, and worktree or local choice are remembered for the next delegation.
+- The agent list on a task shows the thinking level and mode each agent started with.
+
 ## 0.4.0 - 2026-10-30
 
 - Demo mode: a Show demo data switch in Task viewer settings shows a fictional company (tasks, Linear projects, and project issues, with dates relative to today) instead of your real data. Editing and delegation are off while it is on. The delegate form shows fictional repositories.

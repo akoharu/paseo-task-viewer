@@ -16,6 +16,9 @@ export const preferencesSchema = z.object({
   defaultProvider: z.string().default("claude"),
   defaultModel: z.string().default(""),
   defaultMode: z.enum(["local", "worktree"]).default("worktree"),
+  // Last permission mode and thinking level used to start an agent. Used when the provider or model supports them.
+  defaultPermissionModeId: z.string().default(""),
+  defaultThinkingOptionId: z.string().default(""),
   // Pre-filled as extra instructions in every delegation form.
   agentInstructions: z.string().default(""),
   // Shows fictional sample data instead of your real tasks and projects, for screenshots and trying the plugin.

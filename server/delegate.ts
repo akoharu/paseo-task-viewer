@@ -120,7 +120,11 @@ export async function delegateTask(input: DelegateInput, paseo: PaseoApi) {
 
   const agent = await workspace.agents.create({
     title,
-    config: { provider },
+    config: {
+      provider,
+      ...(input.modeId ? { modeId: input.modeId } : {}),
+      ...(input.thinkingOptionId ? { thinkingOptionId: input.thinkingOptionId } : {}),
+    },
     prompt,
     labels: { "task-viewer.task-id": task.id },
     ...(input.mode === "local" && branch
@@ -141,6 +145,8 @@ export async function delegateTask(input: DelegateInput, paseo: PaseoApi) {
     mode: input.mode,
     branch,
     provider,
+    modeLabel: input.modeLabel || null,
+    thinkingLabel: input.thinkingLabel || null,
     createdAt: new Date().toISOString(),
   };
 

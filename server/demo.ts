@@ -351,6 +351,8 @@ export function demoTasks(): Task[] {
         mode: "worktree",
         branch: suggestBranchName(doubleCharge),
         provider: "claude/claude-opus-5-5",
+        modeLabel: "Bypass",
+        thinkingLabel: "High",
         createdAt: iso(0, -25),
       },
     ];
