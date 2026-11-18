@@ -16,6 +16,8 @@ export const preferencesSchema = z.object({
   defaultProvider: z.string().default("claude"),
   defaultModel: z.string().default(""),
   defaultMode: z.enum(["local", "worktree"]).default("worktree"),
+  // Paseo project used for the last delegation, preselected next time.
+  defaultProjectId: z.string().default(""),
   // Last permission mode and thinking level used to start an agent. Used when the provider or model supports them.
   defaultPermissionModeId: z.string().default(""),
   defaultThinkingOptionId: z.string().default(""),

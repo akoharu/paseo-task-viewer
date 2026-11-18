@@ -212,6 +212,12 @@ const PROJECTS: DemoProject[] = [
   },
 ];
 
+const STALE_TITLES = new Set([
+  "Encrypt the local SQLite cache",
+  "Rate limit the public search endpoint",
+  "Reconcile old and new invoices every night",
+]);
+
 function buildIssues(project: DemoProject, firstNumber: number): ProjectIssue[] {
   return project.issues.map(([title, stateName, priority, assignee, dueOffset, milestone], index) => {
     const state = LINEAR_STATES[stateName];
@@ -234,7 +240,9 @@ function buildIssues(project: DemoProject, firstNumber: number): ProjectIssue[] 
       assignedToMe: assignee === "me",
       milestone: milestone ?? null,
       estimate: [1, 2, 3, 5][index % 4],
-      updatedAt: iso(-(index % 6), -index * 37),
+      // A few open tickets are old and untouched, so the Stale badge shows in demo mode.
+      createdAt: STALE_TITLES.has(title) ? iso(-(70 + index)) : iso(-(4 + ((index * 9) % 40))),
+      updatedAt: STALE_TITLES.has(title) ? iso(-(25 + index)) : iso(-(index % 6), -index * 37),
     };
   });
 }
@@ -298,6 +306,7 @@ function baseTask(): Omit<Task, "id" | "source" | "title" | "status" | "statusGr
     dueDate: null,
     cycle: null,
     project: null,
+    remoteCreatedAt: null,
     createdAt: iso(-10),
     updatedAt: iso(-1),
     syncedAt: iso(0, -4),
@@ -337,6 +346,7 @@ export function demoTasks(): Task[] {
         dueDate: issue.dueDate,
         cycle: issue.cycle,
         project: { id: summary.id, name: summary.name },
+        remoteCreatedAt: issue.createdAt,
         updatedAt: issue.updatedAt,
       })),
   );
@@ -362,6 +372,7 @@ export function demoTasks(): Task[] {
     {
       ...baseTask(),
       id: "clickup:demo-1",
+      remoteCreatedAt: iso(-6),
       source: "clickup",
       externalId: "demo-1",
       title: "Update pricing page copy for the new plans",
@@ -379,6 +390,8 @@ export function demoTasks(): Task[] {
     {
       ...baseTask(),
       id: "clickup:demo-2",
+      remoteCreatedAt: iso(-48),
+      updatedAt: iso(-21),
       source: "clickup",
       externalId: "demo-2",
       title: "Customer request: export reports to CSV",
@@ -396,6 +409,7 @@ export function demoTasks(): Task[] {
     {
       ...baseTask(),
       id: "clickup:demo-3",
+      remoteCreatedAt: iso(-12),
       source: "clickup",
       externalId: "demo-3",
       title: "Fix broken links in the help center",
@@ -416,6 +430,7 @@ export function demoTasks(): Task[] {
     {
       ...baseTask(),
       id: "manual:demo-1",
+      createdAt: iso(-2),
       source: "manual",
       title: "Reply to the Slack thread about the SSO rollout",
       description: "Confirm the rollout date with the security team and share the checklist.",
@@ -426,6 +441,7 @@ export function demoTasks(): Task[] {
     {
       ...baseTask(),
       id: "manual:demo-2",
+      createdAt: iso(-1),
       source: "manual",
       title: "Prepare the demo for Friday's product review",
       description: "Show offline check-ins and the new checkout.",

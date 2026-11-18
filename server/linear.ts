@@ -5,7 +5,8 @@ import { looksLikeReview, type RemoteTicket, requestJson } from "./remote";
 const API = "https://api.linear.app/graphql";
 
 const ISSUE_FIELDS = `
-  id identifier title description url priority priorityLabel dueDate updatedAt
+  id identifier title description url priority priorityLabel dueDate createdAt updatedAt
+  assignee { isMe }
   cycle { number name startsAt endsAt }
   project { id name }
   state { name type color }
@@ -27,7 +28,9 @@ const issueSchema = z.object({
     .nullable()
     .optional(),
   dueDate: z.string().nullable().optional(),
+  createdAt: z.string(),
   updatedAt: z.string(),
+  assignee: z.object({ isMe: z.boolean() }).nullable().optional(),
   project: z.object({ id: z.string(), name: z.string() }).nullable().optional(),
   state: stateSchema,
   team: z.object({
@@ -108,6 +111,8 @@ function toTicket(issue: LinearIssue): RemoteTicket {
       : null,
     project: issue.project ? { id: issue.project.id, name: issue.project.name } : null,
     remoteUpdatedAt: issue.updatedAt,
+    remoteCreatedAt: issue.createdAt,
+    assignedToMe: issue.assignee?.isMe ?? false,
   };
 }
 

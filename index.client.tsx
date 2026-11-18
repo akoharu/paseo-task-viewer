@@ -1,6 +1,7 @@
 import type { PluginClientContext, PluginScreenProps, PluginSidebarItemProps } from "@getpaseo/plugin/client";
 import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import type { ComponentType } from "react";
+import { ThemeContext } from "./client/kit";
 import { OpenScreenContext } from "./client/navigation";
 import { ProjectScreen } from "./client/project-screen";
 import { SettingsScreen } from "./client/settings-screen";
@@ -24,7 +25,9 @@ export default function contribute(client: PluginClientContext) {
     function NavigableScreen(props: PluginScreenProps) {
       return (
         <OpenScreenContext.Provider value={openScreen}>
-          <Screen {...props} />
+          <ThemeContext.Provider value={props.theme}>
+            <Screen {...props} />
+          </ThemeContext.Provider>
         </OpenScreenContext.Provider>
       );
     };

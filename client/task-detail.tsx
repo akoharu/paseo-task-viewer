@@ -1,8 +1,8 @@
 import { openExternalUrl, type PluginSurfaceProps, usePaseo, useRpc, useSettings } from "@getpaseo/plugin/client";
-import { TextInput, useToast } from "@getpaseo/plugin/client/react-native";
+import { Icon, TextInput, useToast } from "@getpaseo/plugin/client/react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { DEMO_REPOSITORIES, taskViewerSettings } from "../shared/settings";
 import {
   type DelegationMode,
@@ -18,7 +18,22 @@ import {
 } from "../shared/tasks";
 import { useDemoMode } from "./demo";
 import { openProjectInput, useOpenScreen } from "./navigation";
-import { Button, Chip, ChipRow, errorMessage, Label, relativeTime, statusColor, TaskBadges, type Theme } from "./kit";
+import { ageLabel, daysSince, rankableTask } from "../shared/ranking";
+import {
+  Badge,
+  Button,
+  Chip,
+  ChipRow,
+  errorMessage,
+  Label,
+  relativeTime,
+  shortDate,
+  staleBadge,
+  statusColor,
+  statusTextColor,
+  TaskBadges,
+  type Theme,
+} from "./kit";
 
 type Props = Pick<PluginSurfaceProps, "theme" | "layout" | "navigation"> & {
   task: Task;
@@ -36,6 +51,11 @@ export function TaskDetail({ theme, layout, navigation, task, onClose }: Props) 
   const updateTask = useRpc(updateTaskRpc);
   const deleteTask = useRpc(deleteTaskRpc);
   const openScreen = useOpenScreen();
+  const created = rankableTask(task).created;
+  const [fullDescription, setFullDescription] = useState(false);
+  // Long enough that 8 lines can cut it, also on a narrow phone where lines wrap.
+  const longDescription = task.description.trim().length > 320 || task.description.split("\n").length > 8;
+  const stale = staleBadge(theme, rankableTask(task));
 
   const statusMutation = useMutation({
     mutationFn: (statusGroup: StatusGroup) => updateTask({ id: task.id, statusGroup }),
@@ -65,13 +85,22 @@ export function TaskDetail({ theme, layout, navigation, task, onClose }: Props) 
         </Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: task.statusColor ?? statusColor(theme, task.statusGroup) }} />
-          <Text style={{ color: statusColor(theme, task.statusGroup), fontWeight: "600" }}>{task.status}</Text>
+          <Text style={{ color: statusTextColor(theme, task.statusGroup), fontWeight: "600" }}>{task.status}</Text>
           {task.syncedAt ? <Text style={muted}>Synced {relativeTime(task.syncedAt)}</Text> : null}
+        </View>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+          {created ? (
+            <Text style={muted}>
+              Created {shortDate(new Date(created))} ({ageLabel(daysSince(created) ?? 0)} ago)
+            </Text>
+          ) : null}
+          <Text style={muted}>Updated {relativeTime(task.updatedAt)}</Text>
+          {stale ? <Badge {...stale} /> : null}
         </View>
         <TaskBadges theme={theme} task={task} />
         {task.missing ? (
           <Text style={{ color: theme.colors.statusWarning, fontSize: 12 }}>
-            This ticket is no longer in your assigned queue (unassigned, filtered out, or deleted).
+            This ticket is no longer assigned to you (reassigned, filtered out, or deleted). It stays here only because an agent works on it.
           </Text>
         ) : null}
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
@@ -129,9 +158,16 @@ export function TaskDetail({ theme, layout, navigation, task, onClose }: Props) 
 
       <View style={{ gap: 8 }}>
         <Label theme={theme}>Description</Label>
-        <Text selectable style={{ ...text, lineHeight: 20 }}>
+        <Text selectable numberOfLines={fullDescription ? undefined : 8} style={{ ...text, lineHeight: 20 }}>
           {task.description.trim() || "No description."}
         </Text>
+        {longDescription ? (
+          <Pressable accessibilityRole="button" onPress={() => setFullDescription((value) => !value)} hitSlop={6}>
+            <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12, fontWeight: "600" }}>
+              {fullDescription ? "Show less" : "Show more"}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {task.assignments.length > 0 ? (
@@ -214,7 +250,7 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
     : realProjects;
   const providers = useQuery({ queryKey: ["providers"], queryFn: async () => readProviders(await paseo.providers.snapshot()) });
 
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectPick, setProjectPick] = useState<string | null>(null);
   const [mode, setMode] = useState<DelegationMode>("worktree");
   const [branch, setBranch] = useState(() => suggestBranchName(task));
   const [baseBranch, setBaseBranch] = useState("");
@@ -225,6 +261,8 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
   const [thinkingPick, setThinkingPick] = useState<string | null>(null);
   const [extra, setExtra] = useState("");
   const [initialized, setInitialized] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [allModels, setAllModels] = useState(false);
 
   // Seed the form from saved defaults once they load.
   useEffect(() => {
@@ -236,17 +274,46 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
     setInitialized(true);
   }, [initialized, settings]);
 
-  const selectedProvider = providers.data?.find((entry) => entry.id === provider);
+  const remembered = settings.status === "ready" ? settings.values : null;
+  // The project you picked, else the one you used last time.
+  const projectId = projectPick ?? remembered?.defaultProjectId ?? null;
   const project = projects.data?.find((entry) => entry.projectId === projectId);
-  const visibleModels = useMemo(() => (selectedProvider?.models ?? []).slice(0, 12), [selectedProvider]);
+  const projectName = project ? project.projectCustomName || project.projectDisplayName : null;
+
+  const selectedProvider = providers.data?.find((entry) => entry.id === provider);
   // "Default model" uses the provider's default model, so its thinking levels apply.
   const selectedModel = selectedProvider?.models.find((entry) => (model ? entry.id === model : entry.isDefault)) ?? selectedProvider?.models[0];
+  // A short list first: the default, the current pick, and a few more. The rest is one tap away.
+  const visibleModels = useMemo(() => {
+    const list = selectedProvider?.models ?? [];
+    if (allModels) return list;
+    const short = list.slice(0, 4);
+    const picked = list.find((entry) => entry.id === model);
+    return picked && !short.includes(picked) ? [...short, picked] : short;
+  }, [selectedProvider, allModels, model]);
+  const hiddenModelCount = (selectedProvider?.models.length ?? 0) - visibleModels.length;
 
-  const remembered = settings.status === "ready" ? settings.values : null;
   const permission = pickValid(selectedProvider?.modes ?? [], permissionPick, remembered?.defaultPermissionModeId, selectedProvider?.defaultModeId);
   const thinking = pickValid(selectedModel?.thinking ?? [], thinkingPick, remembered?.defaultThinkingOptionId, selectedModel?.defaultThinkingId);
   const permissionMode = selectedProvider?.modes.find((entry) => entry.id === permission);
   const thinkingOption = selectedModel?.thinking.find((entry) => entry.id === thinking);
+  const risky = isRiskyMode(permissionMode);
+
+  // Open the full options once when there is no remembered project to start with.
+  const [checkedStart, setCheckedStart] = useState(false);
+  useEffect(() => {
+    if (checkedStart || settings.status !== "ready" || !projects.data) return;
+    if (!project) setEditing(true);
+    setCheckedStart(true);
+  }, [checkedStart, settings.status, projects.data, project]);
+
+  const blocker = !project
+    ? "Choose a project first."
+    : !provider
+      ? "Choose an agent first."
+      : mode === "worktree" && !branch.trim()
+        ? "Add a branch name for the new worktree."
+        : null;
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -254,7 +321,7 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
       return delegate({
         taskId: task.id,
         projectId: project.projectId,
-        projectName: project.projectCustomName || project.projectDisplayName,
+        projectName: projectName ?? project.projectDisplayName,
         projectPath: project.projectRootPath,
         mode,
         branch: branch.trim(),
@@ -270,11 +337,12 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
     },
     onSuccess: (result) => {
       queryClient.setQueryData<TaskListOutput>(["tasks"], (old) => replaceTask(old, result.task));
-      // Remember this setup, so the next task starts with the same agent choices.
+      // Remember this setup, so the next task starts with the same choices.
       if (settings.status === "ready") {
         void settings.save(
           {
             ...settings.values,
+            defaultProjectId: project?.projectId ?? settings.values.defaultProjectId,
             defaultMode: mode,
             defaultProvider: provider,
             defaultModel: model,
@@ -300,172 +368,269 @@ function DelegateForm({ theme, task, onStarted }: { theme: Theme; task: Task; on
     backgroundColor: theme.colors.surface1,
   };
   const muted = { color: theme.colors.foregroundMuted, fontSize: 12 };
+  const showForm = editing;
+  const where =
+    mode === "worktree"
+      ? `New worktree · ${branch.trim() || "no branch name"}`
+      : branch.trim()
+        ? `Local checkout · new branch ${branch.trim()}`
+        : "Local checkout · current branch";
+  const agentLine = selectedProvider
+    ? [selectedProvider.label, model ? selectedModel?.label : `${selectedModel?.label ?? "default model"} (default)`, thinkingOption?.label]
+        .filter(Boolean)
+        .join(" · ")
+    : providers.isPending
+      ? "Loading agents…"
+      : "No agent chosen";
 
   return (
-    <View style={{ gap: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
+    <View style={{ gap: 12, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
       <Text style={{ color: theme.colors.foreground, fontSize: 16, fontWeight: "600" }}>Delegate to an agent</Text>
 
-      <View style={{ gap: 6 }}>
-        <Label theme={theme}>Project</Label>
-        {projects.isPending ? <Text style={muted}>Loading projects…</Text> : null}
-        {projects.error ? <Text style={{ color: theme.colors.statusDanger }}>{errorMessage(projects.error)}</Text> : null}
-        <ChipRow>
-          {(projects.data ?? []).map((entry) => (
-            <Chip
-              key={entry.projectId}
-              theme={theme}
-              label={entry.projectCustomName || entry.projectDisplayName}
-              selected={entry.projectId === projectId}
-              onPress={() => setProjectId(entry.projectId)}
-            />
-          ))}
-        </ChipRow>
+      <View style={{ borderRadius: 10, borderWidth: 1, borderColor: risky ? theme.colors.statusWarning : theme.colors.border, backgroundColor: theme.colors.surface1 }}>
+        <SummaryRow theme={theme} label="Project" value={projectName ?? "Not chosen yet"} missing={!projectName} />
+        <SummaryRow theme={theme} label="Where" value={where} />
+        <SummaryRow theme={theme} label="Agent" value={agentLine} />
+        <SummaryRow
+          theme={theme}
+          label="Mode"
+          value={permissionMode?.label ?? "Default"}
+          icon={permissionMode?.icon}
+          warning={risky}
+          last
+        />
       </View>
-
-      <View style={{ gap: 6 }}>
-        <Label theme={theme}>Where</Label>
-        <ChipRow>
-          <Chip theme={theme} label="New worktree" selected={mode === "worktree"} onPress={() => setMode("worktree")} />
-          <Chip theme={theme} label="Local checkout" selected={mode === "local"} onPress={() => setMode("local")} />
-        </ChipRow>
-        <Text style={muted}>
-          {mode === "worktree"
-            ? "Creates a separate worktree and workspace on a new branch. Your main checkout is not touched."
-            : "Adds the agent to the project's existing workspace. Leave the branch empty to stay on the current branch."}
+      {risky ? (
+        <Text style={{ color: theme.colors.statusWarning, fontSize: 12 }}>
+          {permissionMode?.label} lets the agent edit files and run commands without asking you first.
         </Text>
-      </View>
-
-      <View style={{ gap: 6 }}>
-        <Label theme={theme}>{mode === "worktree" ? "New branch" : "New branch (optional)"}</Label>
-        <TextInput
-          value={branch}
-          onChangeText={setBranch}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="feature-branch-name"
-          placeholderTextColor={theme.colors.foregroundMuted}
-          style={inputStyle}
-        />
-        <TextInput
-          value={baseBranch}
-          onChangeText={setBaseBranch}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="Base branch (empty = default)"
-          placeholderTextColor={theme.colors.foregroundMuted}
-          style={inputStyle}
-        />
-      </View>
-
-      <View style={{ gap: 6 }}>
-        <Label theme={theme}>Agent</Label>
-        {providers.error ? <Text style={{ color: theme.colors.statusDanger }}>{errorMessage(providers.error)}</Text> : null}
-        <ChipRow>
-          {(providers.data ?? []).map((entry) => (
-            <Chip
-              key={entry.id}
-              theme={theme}
-              label={entry.label}
-              selected={entry.id === provider}
-              onPress={() => {
-                setProvider(entry.id);
-                setModel("");
-                setPermissionPick(null);
-                setThinkingPick(null);
-              }}
-            />
-          ))}
-        </ChipRow>
-        {visibleModels.length > 0 ? (
-          <ChipRow>
-            <Chip
-              theme={theme}
-              label="Default model"
-              selected={model === ""}
-              onPress={() => {
-                setModel("");
-                setThinkingPick(null);
-              }}
-            />
-            {visibleModels.map((entry) => (
-              <Chip
-                key={entry.id}
-                theme={theme}
-                label={entry.label}
-                selected={entry.id === model}
-                onPress={() => {
-                  setModel(entry.id);
-                  setThinkingPick(null);
-                }}
-              />
-            ))}
-          </ChipRow>
-        ) : null}
-      </View>
-
-      {selectedModel && selectedModel.thinking.length > 0 ? (
-        <View style={{ gap: 6 }}>
-          <Label theme={theme}>Thinking</Label>
-          <ChipRow>
-            {selectedModel.thinking.map((entry) => (
-              <Chip
-                key={entry.id}
-                theme={theme}
-                label={entry.label}
-                selected={entry.id === thinking}
-                onPress={() => setThinkingPick(entry.id)}
-              />
-            ))}
-          </ChipRow>
-        </View>
       ) : null}
 
-      {selectedProvider && selectedProvider.modes.length > 0 ? (
-        <View style={{ gap: 6 }}>
-          <Label theme={theme}>Mode</Label>
-          <ChipRow>
-            {selectedProvider.modes.map((entry) => (
-              <Chip
-                key={entry.id}
-                theme={theme}
-                icon={entry.icon}
-                label={entry.label}
-                selected={entry.id === permission}
-                onPress={() => setPermissionPick(entry.id)}
-              />
-            ))}
-          </ChipRow>
-          {permissionMode?.description ? <Text style={muted}>{permissionMode.description}</Text> : null}
-        </View>
-      ) : null}
-
-      <View style={{ gap: 6 }}>
-        <Label theme={theme}>Extra instructions (optional)</Label>
-        <TextInput
-          value={extra}
-          onChangeText={setExtra}
-          multiline
-          placeholder="For example: open a draft PR when done."
-          placeholderTextColor={theme.colors.foregroundMuted}
-          style={{ ...inputStyle, minHeight: 64, textAlignVertical: "top" }}
-        />
-        <Text style={muted}>
-          The agent always gets the ticket details and rules to update the ticket status in{" "}
-          {task.source === "manual" ? "its source app" : SOURCE_LABELS[task.source]} through its MCP tools or API.
-        </Text>
-      </View>
-
-      <View style={{ flexDirection: "row" }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
         <Button
           theme={theme}
+          icon="Bot"
           label="Start agent"
           busy={mutation.isPending}
-          disabled={!project || !provider || (mode === "worktree" && !branch.trim())}
+          disabled={blocker !== null}
           onPress={() => mutation.mutate()}
         />
+        <Button
+          theme={theme}
+          variant="secondary"
+          label={editing ? "Hide options" : "Change"}
+          onPress={() => setEditing((value) => !value)}
+        />
+        {blocker ? <Text style={{ color: theme.colors.statusWarning, fontSize: 12 }}>{blocker}</Text> : null}
+      </View>
+
+      {showForm ? (
+        <View style={{ gap: 14, paddingTop: 4 }}>
+          <View style={{ gap: 6 }}>
+            <Label theme={theme}>Project</Label>
+            {projects.isPending ? <Text style={muted}>Loading projects…</Text> : null}
+            {projects.error ? <Text style={{ color: theme.colors.statusDanger }}>{errorMessage(projects.error)}</Text> : null}
+            <ChipRow>
+              {(projects.data ?? []).map((entry) => (
+                <Chip
+                  key={entry.projectId}
+                  theme={theme}
+                  label={entry.projectCustomName || entry.projectDisplayName}
+                  selected={entry.projectId === projectId}
+                  onPress={() => setProjectPick(entry.projectId)}
+                />
+              ))}
+            </ChipRow>
+          </View>
+
+          <View style={{ gap: 6 }}>
+            <Label theme={theme}>Where</Label>
+            <ChipRow>
+              <Chip theme={theme} label="New worktree" selected={mode === "worktree"} onPress={() => setMode("worktree")} />
+              <Chip theme={theme} label="Local checkout" selected={mode === "local"} onPress={() => setMode("local")} />
+            </ChipRow>
+            <Text style={muted}>
+              {mode === "worktree"
+                ? "Creates a separate worktree and workspace on a new branch. Your main checkout is not touched."
+                : "Adds the agent to the project's existing workspace. Leave the branch empty to stay on the current branch."}
+            </Text>
+            <TextInput
+              value={branch}
+              onChangeText={setBranch}
+              autoCapitalize="none"
+              autoCorrect={false}
+              accessibilityLabel={mode === "worktree" ? "New branch" : "New branch (optional)"}
+              placeholder={mode === "worktree" ? "New branch name" : "New branch name (optional)"}
+              placeholderTextColor={theme.colors.foregroundMuted}
+              style={inputStyle}
+            />
+            <TextInput
+              value={baseBranch}
+              onChangeText={setBaseBranch}
+              autoCapitalize="none"
+              autoCorrect={false}
+              accessibilityLabel="Base branch"
+              placeholder="Base branch (empty = default)"
+              placeholderTextColor={theme.colors.foregroundMuted}
+              style={inputStyle}
+            />
+          </View>
+
+          <View style={{ gap: 6 }}>
+            <Label theme={theme}>Agent</Label>
+            {providers.error ? <Text style={{ color: theme.colors.statusDanger }}>{errorMessage(providers.error)}</Text> : null}
+            <ChipRow>
+              {(providers.data ?? []).map((entry) => (
+                <Chip
+                  key={entry.id}
+                  theme={theme}
+                  label={entry.label}
+                  selected={entry.id === provider}
+                  onPress={() => {
+                    setProvider(entry.id);
+                    setModel("");
+                    setPermissionPick(null);
+                    setThinkingPick(null);
+                    setAllModels(false);
+                  }}
+                />
+              ))}
+            </ChipRow>
+            {(selectedProvider?.models.length ?? 0) > 0 ? (
+              <ChipRow>
+                <Chip
+                  theme={theme}
+                  label="Default model"
+                  selected={model === ""}
+                  onPress={() => {
+                    setModel("");
+                    setThinkingPick(null);
+                  }}
+                />
+                {visibleModels.map((entry) => (
+                  <Chip
+                    key={entry.id}
+                    theme={theme}
+                    label={entry.label}
+                    selected={entry.id === model}
+                    onPress={() => {
+                      setModel(entry.id);
+                      setThinkingPick(null);
+                    }}
+                  />
+                ))}
+                {hiddenModelCount > 0 ? (
+                  <Chip theme={theme} label={`More models (${hiddenModelCount})`} selected={false} onPress={() => setAllModels(true)} />
+                ) : null}
+              </ChipRow>
+            ) : null}
+          </View>
+
+          {selectedModel && selectedModel.thinking.length > 0 ? (
+            <View style={{ gap: 6 }}>
+              <Label theme={theme}>Thinking</Label>
+              <ChipRow>
+                {selectedModel.thinking.map((entry) => (
+                  <Chip
+                    key={entry.id}
+                    theme={theme}
+                    label={entry.label}
+                    selected={entry.id === thinking}
+                    onPress={() => setThinkingPick(entry.id)}
+                  />
+                ))}
+              </ChipRow>
+            </View>
+          ) : null}
+
+          {selectedProvider && selectedProvider.modes.length > 0 ? (
+            <View style={{ gap: 6 }}>
+              <Label theme={theme}>Mode</Label>
+              <ChipRow>
+                {selectedProvider.modes.map((entry) => (
+                  <Chip
+                    key={entry.id}
+                    theme={theme}
+                    icon={entry.icon}
+                    label={entry.label}
+                    selected={entry.id === permission}
+                    onPress={() => setPermissionPick(entry.id)}
+                  />
+                ))}
+              </ChipRow>
+              {permissionMode?.description ? <Text style={muted}>{permissionMode.description}</Text> : null}
+            </View>
+          ) : null}
+
+          <View style={{ gap: 6 }}>
+            <Label theme={theme}>Extra instructions (optional)</Label>
+            <TextInput
+              value={extra}
+              onChangeText={setExtra}
+              multiline
+              accessibilityLabel="Extra instructions"
+              placeholder="For example: open a draft PR when done."
+              placeholderTextColor={theme.colors.foregroundMuted}
+              style={{ ...inputStyle, minHeight: 64, textAlignVertical: "top" }}
+            />
+            <Text style={muted}>
+              The agent always gets the ticket details and rules to update the ticket status in{" "}
+              {task.source === "manual" ? "its source app" : SOURCE_LABELS[task.source]} through its MCP tools or API.
+            </Text>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function SummaryRow({
+  theme,
+  label,
+  value,
+  icon,
+  missing = false,
+  warning = false,
+  last = false,
+}: {
+  theme: Theme;
+  label: string;
+  value: string;
+  icon?: string;
+  missing?: boolean;
+  warning?: boolean;
+  last?: boolean;
+}) {
+  const color = warning ? theme.colors.statusWarning : missing ? theme.colors.foregroundMuted : theme.colors.foreground;
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+        borderBottomWidth: last ? 0 : 1,
+        borderBottomColor: theme.colors.border,
+      }}
+    >
+      <Text style={{ width: 64, color: theme.colors.foregroundMuted, fontSize: 12 }}>{label}</Text>
+      <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
+        {icon && MODE_ICONS.has(icon) ? <Icon name={icon} size={14} color={color} /> : null}
+        <Text numberOfLines={2} style={{ flex: 1, color, fontSize: 13, fontWeight: warning ? "600" : "500" }}>
+          {value}
+        </Text>
       </View>
     </View>
   );
+}
+
+const MODE_ICONS = new Set(["Shield", "ShieldCheck", "ShieldEllipsis", "ShieldOff", "ShieldPlus", "ShieldAlert"]);
+
+// Modes that let the agent act without asking, such as Claude "Bypass" or Codex "Full Access".
+function isRiskyMode(mode: { id: string; label: string } | undefined): boolean {
+  if (!mode) return false;
+  return /bypass|full.?access|danger|yolo/i.test(`${mode.id} ${mode.label}`);
 }
 
 type Option = { id: string; label: string; description?: string; icon?: string };

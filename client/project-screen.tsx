@@ -13,13 +13,17 @@ import {
   Label,
   ProgressBar,
   relativeTime,
+  createdLabel,
   SearchInput,
   Segmented,
   shortDate,
+  staleBadge,
   statusColor,
+  statusTextColor,
   TaskBadges,
   type Theme,
 } from "./kit";
+import { rankableIssue } from "../shared/ranking";
 import { doneLabel, openCount, ProjectBadges, stageLine, statusTypeColor } from "./projects-view";
 import { TaskDetail } from "./task-detail";
 
@@ -201,7 +205,7 @@ export function ProjectScreen({ theme, layout, navigation, params }: PluginScree
 
         {groups.map(({ group, issues: groupIssues }) => (
           <View key={group} style={{ gap: 6 }}>
-            <Text style={{ color: statusColor(theme, group), fontSize: 12, fontWeight: "700", textTransform: "uppercase" }}>
+            <Text style={{ color: statusTextColor(theme, group), fontSize: 12, fontWeight: "700", textTransform: "uppercase" }}>
               {STATUS_GROUP_LABELS[group]} · {groupIssues.length}
             </Text>
             {groupIssues.map((issue) => (
@@ -230,7 +234,8 @@ export function ProjectScreen({ theme, layout, navigation, params }: PluginScree
 
 function IssueRow({ theme, issue, onPress }: { theme: Theme; issue: ProjectIssue; onPress(): void }) {
   const assignee = issue.assigneeName ? `${issue.assigneeName}${issue.assignedToMe ? " (you)" : ""}` : "Unassigned";
-  const meta = [issue.identifier, assignee, issue.milestone].filter(Boolean).join(" · ");
+  const item = rankableIssue(issue);
+  const meta = [issue.identifier, assignee, issue.milestone, createdLabel(item)].filter(Boolean).join(" · ");
   return (
     <Pressable
       accessibilityRole="button"
@@ -255,9 +260,9 @@ function IssueRow({ theme, issue, onPress }: { theme: Theme; issue: ProjectIssue
         <Text numberOfLines={1} style={{ color: issue.assigneeName ? theme.colors.foregroundMuted : theme.colors.statusWarning, fontSize: 12 }}>
           {meta}
         </Text>
-        <TaskBadges theme={theme} task={issue} />
+        <TaskBadges theme={theme} task={issue} extra={staleBadge(theme, rankableIssue(issue))} />
       </View>
-      <Text numberOfLines={1} style={{ color: statusColor(theme, issue.statusGroup), fontSize: 12, fontWeight: "600", maxWidth: 120 }}>
+      <Text numberOfLines={1} style={{ color: statusTextColor(theme, issue.statusGroup), fontSize: 12, fontWeight: "600", maxWidth: 120 }}>
         {issue.status}
       </Text>
     </Pressable>
@@ -274,8 +279,8 @@ function IssueDetail({ theme, issue }: { theme: Theme; issue: ProjectIssue }) {
         <Text selectable style={{ color: theme.colors.foreground, fontSize: 18, fontWeight: "600" }}>
           {issue.title}
         </Text>
-        <Text style={{ color: statusColor(theme, issue.statusGroup), fontWeight: "600" }}>{issue.status}</Text>
-        <TaskBadges theme={theme} task={issue} />
+        <Text style={{ color: statusTextColor(theme, issue.statusGroup), fontWeight: "600" }}>{issue.status}</Text>
+        <TaskBadges theme={theme} task={issue} extra={staleBadge(theme, rankableIssue(issue))} />
         {issue.estimate !== null ? <Text style={muted}>Estimate: {issue.estimate}</Text> : null}
       </View>
       <View style={{ flexDirection: "row" }}>

@@ -57,6 +57,7 @@ const issueSchema = z.object({
   priorityLabel: z.string().nullable().optional(),
   dueDate: z.string().nullable().optional(),
   estimate: z.number().nullable().optional(),
+  createdAt: z.string().nullable().optional(),
   updatedAt: z.string(),
   state: stateSchema,
   assignee: z.object({ name: z.string(), displayName: z.string().nullable().optional(), isMe: z.boolean() }).nullable().optional(),
@@ -210,7 +211,7 @@ async function fetchProject(projectId: string) {
           `query($id: String!, $after: String) { project(id: $id) {
             issues(first: 100, after: $after) {
               nodes {
-                id identifier title description url priority priorityLabel dueDate estimate updatedAt
+                id identifier title description url priority priorityLabel dueDate estimate createdAt updatedAt
                 state { name type color }
                 assignee { name displayName isMe }
                 cycle { number name startsAt endsAt }
@@ -244,6 +245,7 @@ async function fetchProject(projectId: string) {
         assignedToMe: issue.assignee?.isMe ?? false,
         milestone: issue.projectMilestone?.name ?? null,
         estimate: issue.estimate ?? null,
+        createdAt: issue.createdAt ?? null,
         updatedAt: issue.updatedAt,
       });
     }

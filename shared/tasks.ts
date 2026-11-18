@@ -63,6 +63,8 @@ export const taskSchema = z.object({
   cycle: cycleSchema.nullable().default(null),
   // The Linear project the issue belongs to.
   project: z.object({ id: z.string(), name: z.string() }).nullable().default(null),
+  // When the ticket was created in ClickUp or Linear. Null for manual tasks and tasks saved before 0.6.0.
+  remoteCreatedAt: z.string().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
   syncedAt: z.string().nullable(),

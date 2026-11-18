@@ -1,10 +1,41 @@
 import type { PluginHostProps } from "@getpaseo/plugin/client";
 import { Icon, ScrollView, TextInput } from "@getpaseo/plugin/client/react-native";
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ageLabel, daysSince, isStale, type Rankable, type ReasonKind } from "../shared/ranking";
 import { cycleLabel, cycleState, isOpenStatus, parseDueDate, type StatusGroup, type Task } from "../shared/tasks";
 
 export type Theme = PluginHostProps["theme"];
+
+// Screens share their theme here, so small pieces like Badge can use readable text colors.
+export const ThemeContext = createContext<Theme | null>(null);
+
+// Readable text color for a status. The hue stays on the dot next to it; small colored text fails contrast.
+export function statusTextColor(theme: Theme, group: StatusGroup): string {
+  switch (group) {
+    case "in_progress":
+      return theme.colors.foreground;
+    case "review":
+      return theme.colors.statusWarning;
+    default:
+      return theme.colors.foregroundMuted;
+  }
+}
+
+export function Disclosure({ theme, open, label, onPress }: { theme: Theme; open: boolean; label: string; onPress(): void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4 }}
+    >
+      <Icon name={open ? "ChevronDown" : "ChevronRight"} size={14} color={theme.colors.foregroundMuted} />
+      <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12, fontWeight: "700", textTransform: "uppercase" }}>{label}</Text>
+    </Pressable>
+  );
+}
 
 export function statusColor(theme: Theme, group: StatusGroup): string {
   switch (group) {
@@ -188,10 +219,24 @@ export function cycleBadge(theme: Theme, task: Pick<Task, "cycle">): BadgeSpec |
   return { label: `${cycleLabel(task.cycle)} · ${state}`, color };
 }
 
+// Color goes on the border and dot; the text uses the theme's normal text color so it stays readable.
 export function Badge({ label, color }: BadgeSpec) {
+  const theme = useContext(ThemeContext);
   return (
-    <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: color }}>
-      <Text numberOfLines={1} style={{ color, fontSize: 11, fontWeight: "600" }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: color,
+      }}
+    >
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+      <Text numberOfLines={1} style={{ color: theme?.colors.foreground ?? color, fontSize: 12, fontWeight: "500" }}>
         {label}
       </Text>
     </View>
@@ -201,17 +246,62 @@ export function Badge({ label, color }: BadgeSpec) {
 type BadgeFields = Pick<Task, "priority" | "priorityRank" | "dueDate" | "statusGroup" | "cycle">;
 
 // Priority, deadline, and Linear cycle. Renders nothing when the task has none of them.
-export function TaskBadges({ theme, task }: { theme: Theme; task: BadgeFields }) {
+export function TaskBadges({
+  theme,
+  task,
+  extra,
+  hidePriority = false,
+}: {
+  theme: Theme;
+  task: BadgeFields;
+  extra?: BadgeSpec | null;
+  // Set when the row already says the priority, for example the reason "Urgent".
+  hidePriority?: boolean;
+}) {
   const due = dueBadge(theme, task);
-  const cycle = cycleBadge(theme, task);
-  if (!task.priority && !due && !cycle) return null;
+  // Being in the current cycle is the normal case, so only past or upcoming cycles get a badge.
+  const cycle = task.cycle && cycleState(task.cycle) !== "current" ? cycleBadge(theme, task) : null;
+  if (hidePriority) task = { ...task, priority: null };
+  if (!task.priority && !due && !cycle && !extra) return null;
   return (
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
       {task.priority ? <Badge label={task.priority} color={priorityColor(theme, task.priorityRank)} /> : null}
       {due ? <Badge label={due.label} color={due.color} /> : null}
       {cycle ? <Badge label={cycle.label} color={cycle.color} /> : null}
+      {extra ? <Badge label={extra.label} color={extra.color} /> : null}
     </View>
   );
+}
+
+// "Stale · no update 20 d" for old open tickets nobody touched for a while.
+export function staleBadge(theme: Theme, item: Rankable): BadgeSpec | null {
+  if (!isStale(item)) return null;
+  return { label: `Stale · no update ${ageLabel(daysSince(item.updatedAt) ?? 0)}`, color: theme.colors.statusWarning };
+}
+
+// "created 12 d ago", or null when the source did not report a creation date.
+export function createdLabel(item: Rankable): string | null {
+  const days = daysSince(item.created);
+  if (days === null) return null;
+  return days < 1 ? "created today" : `created ${ageLabel(days)} ago`;
+}
+
+export function reasonColor(theme: Theme, kind: ReasonKind): string {
+  switch (kind) {
+    case "overdue":
+    case "urgent":
+      return theme.colors.statusDanger;
+    case "due-today":
+    case "due-tomorrow":
+    case "due-soon":
+    case "high":
+      return theme.colors.statusWarning;
+    case "in-progress":
+    case "current-cycle":
+      return theme.colors.foreground;
+    default:
+      return theme.colors.foregroundMuted;
+  }
 }
 
 export function ProgressBar({ theme, value, height = 6 }: { theme: Theme; value: number; height?: number }) {

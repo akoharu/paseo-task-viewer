@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 - 2026-11-18
+
+- Fix: tickets that were reassigned to someone else stayed in the list (and kept an old status). The sync now removes them. A ticket stays only if an agent you started works on it, in a collapsed "No longer assigned to you" section.
+- New default order, Up next: open tickets ranked by deadline, priority, work already started, and current cycle, with the reason for each rank. Tickets waiting on review rank lower. The other orders are By status (sorted by priority in each group) and Oldest.
+- Every ticket and project issue shows when it was created in ClickUp or Linear. The task detail shows the exact created date and the last update.
+- Stale badge for open tickets older than 30 days with no update for 14 days.
+- Up next is split into Now (top 3, stronger cards), Next, and Waiting on others (in review, collapsed). The ranking rule is behind "How this is ranked".
+- Delegate form: a summary of project, place and branch, agent, and mode, with Start agent right below it and the full options behind Change. The last project is remembered. Bypass and Full Access modes show a warning. A disabled Start agent says why. The model list shows a few models first, with the rest one tap away.
+- Readability: badge text uses the normal text color (the color stays on the border and dot) at 12px, because small green text failed contrast. The current-cycle badge is hidden (only past or upcoming cycles show), and the priority badge is hidden when the row's reason already says it. Status text uses readable colors.
+- Long descriptions are cut to 8 lines with Show more. Collapsible sections use chevron icons and report their open state to screen readers. Task rows tell screen readers their rank, reason, and priority.
+- Screenshots updated.
+
 ## 0.5.0 - 2026-11-17
 
 - Delegate form: choose the thinking level and the mode (for example Plan mode, Always ask, Accept file edits, Auto mode, or Bypass) for the agent. The options come from the selected provider and model, with their defaults selected, and mode chips use the same icons as Paseo.

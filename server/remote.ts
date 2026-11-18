@@ -17,7 +17,13 @@ export type RemoteTicket = Pick<
   | "dueDate"
   | "cycle"
   | "project"
-> & { externalId: string; remoteUpdatedAt: string | null };
+  | "remoteCreatedAt"
+> & {
+  externalId: string;
+  remoteUpdatedAt: string | null;
+  // False when the ticket is now assigned to someone else or to nobody.
+  assignedToMe: boolean;
+};
 
 export class HttpError extends Error {
   constructor(

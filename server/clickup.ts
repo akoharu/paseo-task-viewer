@@ -22,7 +22,9 @@ const taskSchema = z.object({
   list: z.object({ id: z.string(), name: z.string().optional() }).nullable().optional(),
   priority: z.object({ priority: z.string().nullable().optional() }).nullable().optional(),
   due_date: z.string().nullable().optional(),
+  date_created: z.string().nullable().optional(),
   date_updated: z.string().nullable().optional(),
+  assignees: z.array(z.object({ id: z.number() })).optional(),
 });
 type ClickUpTask = z.infer<typeof taskSchema>;
 
@@ -50,7 +52,7 @@ function toIso(ms: string | null | undefined): string | null {
   return Number.isFinite(value) ? new Date(value).toISOString() : null;
 }
 
-function toTicket(task: ClickUpTask, statuses: TicketStatus[]): RemoteTicket {
+function toTicket(task: ClickUpTask, statuses: TicketStatus[], myId: number): RemoteTicket {
   const priority = task.priority?.priority?.toLowerCase() ?? null;
   return {
     externalId: task.id,
@@ -70,6 +72,8 @@ function toTicket(task: ClickUpTask, statuses: TicketStatus[]): RemoteTicket {
     cycle: null,
     project: null,
     remoteUpdatedAt: toIso(task.date_updated),
+    remoteCreatedAt: toIso(task.date_created),
+    assignedToMe: (task.assignees ?? []).some((assignee) => assignee.id === myId),
   };
 }
 
@@ -122,7 +126,7 @@ export async function fetchClickUp(token: string, options: ClickUpOptions) {
 
   const open: RemoteTicket[] = [];
   for (const task of raw) {
-    open.push(toTicket(task, await statusesFor(task.list?.id)));
+    open.push(toTicket(task, await statusesFor(task.list?.id), user.user.id));
   }
 
   return {
@@ -131,7 +135,7 @@ export async function fetchClickUp(token: string, options: ClickUpOptions) {
     async fetchOne(id: string): Promise<RemoteTicket | null> {
       try {
         const task = taskSchema.parse(await get(`/task/${id}?include_markdown_description=true`));
-        return toTicket(task, await statusesFor(task.list?.id));
+        return toTicket(task, await statusesFor(task.list?.id), user.user.id);
       } catch (error) {
         if (error instanceof HttpError && (error.status === 404 || error.status === 401)) return null;
         throw error;

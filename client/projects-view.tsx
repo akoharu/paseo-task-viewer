@@ -9,6 +9,7 @@ import {
   type BadgeSpec,
   daysUntil,
   deadlineBadge,
+  Disclosure,
   errorMessage,
   FilterGroup,
   IconButton,
@@ -184,11 +185,12 @@ export function ProjectsView({ theme, layout, tabs }: Pick<PluginSurfaceProps, "
 
       {quiet.length > 0 ? (
         <View style={{ gap: 8 }}>
-          <Pressable accessibilityRole="button" onPress={() => setShowQuiet((value) => !value)} style={{ paddingVertical: 4 }}>
-            <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12, fontWeight: "700", textTransform: "uppercase" }}>
-              {showQuiet ? "▾" : "▸"} No open issues · {quiet.length}
-            </Text>
-          </Pressable>
+          <Disclosure
+            theme={theme}
+            open={showQuiet}
+            label={`No open issues · ${quiet.length}`}
+            onPress={() => setShowQuiet((value) => !value)}
+          />
           {showQuiet
             ? quiet.map((project) => <ProjectCard key={project.id} theme={theme} project={project} onPress={() => open(project)} />)
             : null}
@@ -207,9 +209,9 @@ export function ProjectBadges({ theme, project }: { theme: Theme; project: Proje
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
       {health ? <Badge {...health} /> : null}
       {target ? <Badge {...target} /> : null}
-      {project.counts.mine > 0 ? <Badge label={`${project.counts.mine} yours`} color={theme.colors.accent} /> : null}
+      {project.counts.mine > 0 ? <Badge label={`Yours: ${project.counts.mine}`} color={theme.colors.accent} /> : null}
       {project.counts.unassigned > 0 ? (
-        <Badge label={`${project.counts.unassigned} unassigned`} color={theme.colors.statusWarning} />
+        <Badge label={`Unassigned: ${project.counts.unassigned}`} color={theme.colors.statusWarning} />
       ) : null}
       <Badge label={project.isLead ? "You lead" : `Lead: ${project.leadName ?? "none"}`} color={theme.colors.foregroundMuted} />
     </View>

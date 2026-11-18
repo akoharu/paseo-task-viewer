@@ -59,6 +59,8 @@ export const projectIssueSchema = z.object({
   assignedToMe: z.boolean(),
   milestone: z.string().nullable(),
   estimate: z.number().nullable(),
+  // When the issue was created in Linear.
+  createdAt: z.string().nullable().default(null),
   updatedAt: z.string(),
 });
 export type ProjectIssue = z.infer<typeof projectIssueSchema>;

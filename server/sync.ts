@@ -59,8 +59,7 @@ async function runSync(preferences: SyncPreferences): Promise<void> {
           task.source === source &&
           task.externalId &&
           !openIds.has(task.externalId) &&
-          isOpenStatus(task.statusGroup) &&
-          !task.missing,
+          isOpenStatus(task.statusGroup),
       )
       .map((task) => task.externalId as string)
       .slice(0, MAX_SINGLE_LOOKUPS);
@@ -127,13 +126,17 @@ function merge(tasks: Task[], results: SourceResult[]): Task[] {
   for (const result of results) {
     const entries = [
       ...result.open.map((ticket) => ({ ticket, inQueue: true })),
-      // A refreshed ticket that is still open was unassigned or filtered out, so flag it.
-      ...result.refreshed.map((ticket) => ({ ticket, inQueue: !isOpenStatus(ticket.statusGroup) })),
+      // A refreshed ticket stays yours only when it is finished and still assigned to you.
+      // Still open means it was filtered out; another assignee means it left your queue.
+      ...result.refreshed.map((ticket) => ({
+        ticket,
+        inQueue: ticket.assignedToMe && !isOpenStatus(ticket.statusGroup),
+      })),
     ];
     for (const { ticket, inQueue } of entries) {
       const id = `${result.source}:${ticket.externalId}`;
       const existing = byKey.get(id);
-      const { remoteUpdatedAt, ...fields } = ticket;
+      const { remoteUpdatedAt, assignedToMe: _assignedToMe, ...fields } = ticket;
       byKey.set(id, {
         id,
         source: result.source,
@@ -152,11 +155,11 @@ function merge(tasks: Task[], results: SourceResult[]): Task[] {
   }
 
   const cutoff = Date.now() - DONE_RETENTION_MS;
-  return [...byKey.values()].filter(
-    (task) =>
-      task.source === "manual" ||
-      task.assignments.length > 0 ||
-      (isOpenStatus(task.statusGroup) && !task.missing) ||
-      Date.parse(task.updatedAt) > cutoff,
-  );
+  return [...byKey.values()].filter((task) => {
+    if (task.source === "manual" || task.assignments.length > 0) return true;
+    // Not assigned to you any more, and no agent works on it: drop it.
+    if (task.missing) return false;
+    // Finished tickets stay visible under Done for a while.
+    return isOpenStatus(task.statusGroup) || Date.parse(task.updatedAt) > cutoff;
+  });
 }
